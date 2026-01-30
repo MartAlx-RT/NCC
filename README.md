@@ -1,5 +1,5 @@
 This c-like language has weak typing.
-To declarate a variable or a pointer just write a name and initializate them:
+To declare a variable or a pointer just write a name and initialize them:
 
 a = 5;
 b = &a;
@@ -8,7 +8,7 @@ To declare a function, type 'func' before it's name:
 
 func useless() { pass; }
 
-To use variables via pointer, use asm-like syntax:
+To use a variable via pointer, use asm-like syntax:
 
 [b] = [b] * 2;
 
