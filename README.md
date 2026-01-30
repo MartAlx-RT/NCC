@@ -13,7 +13,7 @@ To use variables via pointer, use asm-like syntax:
 [b] = [b] * 2;
 
 Standard library doesn't have an allocator. This simple excercise for the curious reader.
-If you shure that your index won't out from memory range, you can try to use arrays:
+If you are shure that your index won't out from memory range, you can try to use arrays:
 
 arr = 100; /* <--that's enough, I'm shure...(probably) */
 i = 0; while (i < 10) { [arr + i] = i; i = i+1; }
