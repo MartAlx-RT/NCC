@@ -206,18 +206,18 @@ static void GnrtArifm(const node_t *tree, const size_t n_var)
 		print_asm("push %ld ;push num\n\n", tree->data.val.num);
 		return;
 	case TP_VAR:
-		print_asm("mov rbp, rsp\n"
-				  "add rbp, %lu ;calculate var pos in stack\n"
-				  "push [rbp] ;push var\n\n",
+		print_asm("mov rbx, rbp\n"
+				  "sub rbx, %lu*8 ;calculate var pos in stack\n"
+				  "push qword[rbx] ;push var\n\n",
 				  tree->data.val.id);
 		return;
 	case TP_DEREF:
 		GnrtDeref(tree, n_var);
 		return;
 	case TP_TAKEADDR:
-		print_asm("mov rbp, %lu\n"
-				  "add rbp, rsp\n"
-				  "push rbp ;&\n\n",
+		print_asm("mov rbx, %lu\n"
+				  "sub rbx, rbp\n"
+				  "push rbx ;&\n\n",
 				  tree->data.val.id);
 		return;
 	case TP_OP:
@@ -227,20 +227,23 @@ static void GnrtArifm(const node_t *tree, const size_t n_var)
 		GnrtExpr(LEFT(tree), n_var);
 		GnrtExpr(RIGHT(tree), n_var);
 
+		print_asm("pop rax\n"
+				"pop rdx\n");
+
 		switch(tree->data.val.op)
 		{
 		case OP_ADD:
-			print_asm("add\n");
-			return;
+			print_asm("add\t");
+			break;
 		case OP_SUB:
-			print_asm("sub\n");
-			return;
+			print_asm("sub\t");
+			break;
 		case OP_MUL:
-			print_asm("mul\n");
-			return;
-		case OP_DIV:
-			print_asm("div\n");
-			return;
+			print_asm("imul\t");
+			break;
+		case OP_DIV:			/* temporarily not supported */
+//			print_asm("div\n");
+//			return;
 		case OP_GREATER:
 		case OP_LESS:
 		case OP_ASSIGN:
@@ -249,8 +252,13 @@ static void GnrtArifm(const node_t *tree, const size_t n_var)
 		case OP_AND:
 		default:
 			err_exit_msg("invalid operation");
+			break;
 		}
+
+		print_asm("rax, rdx\n"
+				"push\trax\n");
 		return;
+
 	case TP_EOF:
 	case TP_ROOT:
 	case TP_OP_SEQ:
@@ -277,12 +285,14 @@ static void GnrtDeclFunc(const node_t *tree)
 		err_exit_msg("invalid node");
 
 	print_asm("%s:\n", tree->data.val.name);
+	print_asm("push rbp\nmov rbp, rsp\n");
 
 	GnrtOpSeq(RIGHT(tree), GetMaxID(tree));
 	
 	if(strcmp("main", tree->data.val.name) == 0)
 		print_asm("hlt\n");
 
+	print_asm("pop rbp\n");
 	print_asm("ret\n\n"); /* dubiously */
 }
 
@@ -573,9 +583,9 @@ static void GnrtAssign(const node_t *tree, const size_t n_var)
 
 	if(LEFT(tree)->data.type == TP_VAR)
 	{
-		print_asm("mov rbp, rsp\n"
-				  "add rbp, %lu ;calculate var pos in stack\n"
-				  "pop [rbp] ;assign var a value\n\n",
+		print_asm("mov rbx, rbp\n"
+				  "sub rbx, %lu*8 ;calculate var pos in stack\n"
+				  "pop qword[rbx] ;assign var a value\n\n",
 				  LEFT(tree)->data.val.id);
 	}
 	else if(LEFT(tree)->data.type == TP_DEREF)
@@ -585,7 +595,7 @@ static void GnrtAssign(const node_t *tree, const size_t n_var)
 
 		GnrtExpr(LEFT(tree)->child->node, n_var);
 		print_asm("pop rbx\n"
-				  "pop [rbx] ;assign [] a value\n\n");
+				  "pop qword[rbx] ;assign [] a value\n\n");
 	}
 	else
 		err_exit_msg("lvalue must be variable or dereference ptr");
@@ -603,41 +613,50 @@ static void GnrtCallFunc(const node_t *tree, const size_t n_var)
 
 	print_asm(";call function\n"
 			  ";-------------\n");
-	// print_asm(";call function\n"
-	// 		  "mov rdi, rsp\n"
-	// 		  "add rdi, %lu ;di points to new memory segment\n",
-	// 		  n_var);
+
+	/* push to arifmetic stack */
+//	while (param)
+//	{
+//		if(param->node == NULL)
+//			err_exit_msg("non-existing param");
+//
+//		GnrtExpr(param->node, n_var);
+//
+//		param = param->next;
+//	}
 
 	child_t *param = tree->child->node->child;
-	/* push to arifmetic stack */
-	while (param)
-	{
-		if(param->node == NULL)
-			err_exit_msg("non-existing param");
-
-		GnrtExpr(param->node, n_var);
-
-		param = param->next;
-	}
+	PushFuncParam(param);
 	
-	/* load parameters to ram stack */
-	print_asm("mov rbp, rsp\n"
-			  "add rbp, %lu ;last param pos\n",
-			  n_var + tree->child->node->data.val.id - 1);
+	print_asm("mov rbx, rsp\n"
+			  "sub rbx, %lu*8 ;last param pos\n",
+			  n_var + tree->child->node->data.val.id - 1 + 2);
 
-							/* num of parameters */
+				/* num of parameters */
 	for (size_t i = 0; i < tree->child->node->data.val.id; i++) 
 	{
-		print_asm("pop [rbp] ;load param\n"
-				  "sub rbp, 1\n");
+		print_asm("pop qword[rbx] ;load param\n"
+				  "add rbx, 1*8\n");
 	}
 
-	print_asm("add rsp, %lu ;shift sp\n"
-			  "call %s\n"
-			  "sub rsp, %lu ;shift back\n"
+	print_asm(	  "call %s\n"
 			  ";-------------\n\n",
-			  n_var, tree->data.val.name, n_var);
+			  tree->data.val.name);
+
+	print_asm("push rax\t; save ret val\n");
 }
+
+static void PushFuncParam(child_t *param)
+{
+	if(param)
+	{
+		PushFuncParam(param->next);
+		GnrtExpr(param->node);
+	}
+	else
+		return;
+}
+
 
 static void GnrtReturn(const node_t *tree, const size_t n_var)
 {
@@ -647,7 +666,10 @@ static void GnrtReturn(const node_t *tree, const size_t n_var)
 		err_exit_msg("is not a 'return'");
 	
 	if(tree->child && tree->child->node)
+	{
 		GnrtExpr(tree->child->node, n_var);
+		print_asm("pop rax\t; rax = ret value\n");
+	}
 	
 	print_asm("ret\n");
 }
@@ -683,8 +705,8 @@ static void GnrtDeref(const node_t *tree, const size_t n_var)
 
 	GnrtExpr(tree->child->node, n_var);
 
-	print_asm("pop rbp\n"
-			  "push [rbp] ;push deref ptr\n\n");
+	print_asm("pop rbx\n"
+			  "push qword[rbx] ;push deref ptr\n\n");
 }
 
 /* counts number of variables in tree */

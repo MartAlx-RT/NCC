@@ -125,8 +125,8 @@ static int Compile(const char *in_filename, const char *out_filename, const char
 	fclose(output_asm);
 	output_asm = NULL;
 	
-	if (system(sys_msg))
-		goto err_exit;
+//	if (system(sys_msg))
+//		goto err_exit;
 
 	/*---------------------*/
 	free(code);
