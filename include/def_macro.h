@@ -11,7 +11,7 @@
 #define COMMA 				(const node_data_t){.type = TP_SYMB, .val.symb = SYM_COMMA}
 #define OPN_BRK				(const node_data_t){.type = TP_SYMB, .val.symb = SYM_OPN_BRK}
 #define CLS_BRK				(const node_data_t){.type = TP_SYMB, .val.symb = SYM_CLS_BRK}
-#define EQ 					(const node_data_t){.type = TP_OP, .val.op = OP_EQ}
+#define EQ 				(const node_data_t){.type = TP_OP, .val.op = OP_EQ}
 #define ASSIGN 				(const node_data_t){.type = TP_OP, .val.op = OP_ASSIGN}
 #define ADD 				(const node_data_t){.type = TP_OP, .val.op = OP_ADD}
 #define SUB 				(const node_data_t){.type = TP_OP, .val.op = OP_SUB}
@@ -19,10 +19,10 @@
 #define LESS 				(const node_data_t){.type = TP_OP, .val.op = OP_LESS}
 #define MUL 				(const node_data_t){.type = TP_OP, .val.op = OP_MUL}
 #define DIV 				(const node_data_t){.type = TP_OP, .val.op = OP_DIV}
-#define OR 					(const node_data_t){.type = TP_OP, .val.op = OP_OR}
+#define OR 				(const node_data_t){.type = TP_OP, .val.op = OP_OR}
 #define AND 				(const node_data_t){.type = TP_OP, .val.op = OP_AND}
 #define FUNC				(const node_data_t){.type = TP_KWORD, .val.kword = KW_FUNC}
-#define IF 					(const node_data_t){.type = TP_KWORD, .val.kword = KW_IF}
+#define IF 				(const node_data_t){.type = TP_KWORD, .val.kword = KW_IF}
 #define ELSE 				(const node_data_t){.type = TP_KWORD, .val.kword = KW_ELSE}
 #define WHILE 				(const node_data_t){.type = TP_KWORD, .val.kword = KW_WHILE}
 #define FOR 				(const node_data_t){.type = TP_KWORD, .val.kword = KW_FOR}
@@ -32,13 +32,13 @@
 #define BREAK				(const node_data_t){.type = TP_KWORD, .val.kword = KW_BREAK}
 #define CONTINUE			(const node_data_t){.type = TP_KWORD, .val.kword = KW_CONTINUE}
 
-#define FUNC_DECL(f_name)	(const node_data_t){.type = TP_DECL_FUNC, .val.name = f_name}
-#define FUNC_CALL(f_name)	(const node_data_t){.type = TP_CALL_FUNC, .val.name = f_name}
+#define FUNC_DECL(f_name)		(const node_data_t){.type = TP_DECL_FUNC, .val.name = f_name}
+#define FUNC_CALL(f_name)		(const node_data_t){.type = TP_CALL_FUNC, .val.name = f_name}
 #define VAR(var_id)			(const node_data_t){.type = TP_VAR, .val.id = var_id}
-#define TAKEADDR(var_id)	(const node_data_t){.type = TP_TAKEADDR, .val.id = var_id}
+#define TAKEADDR(var_id)		(const node_data_t){.type = TP_TAKEADDR, .val.id = var_id}
 #define NUM(n)				(const node_data_t){.type = TP_NUM, .val.num = n}
-#define CHILD_EXISTS(ch)	(ch && ch->node)
-#define IS_BINNODE(tr)		(CHILD_EXISTS(tr->child) && CHILD_EXISTS(tr->child->next) && !CHILD_EXISTS(tr->child->next->next))
+#define CHILD_EXISTS(ch)		(ch && ch->node)
+#define IS_BINNODE(tr)			(CHILD_EXISTS(tr->child) && CHILD_EXISTS(tr->child->next) && !CHILD_EXISTS(tr->child->next->next))
 #define LEFT(tr)			tr->child->node
 #define RIGHT(tr)			tr->child->next->node
 
