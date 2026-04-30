@@ -1,4 +1,4 @@
-#include "NCC.h"
+#include "ncc.h"
 
 static size_t CRNT_LINE = 1;	/* global lines counter */
 	
@@ -86,7 +86,7 @@ static int Lexem(toks_t *toks, const char **s)
 	return 0;
 }
 
-#include "MacroDef.h"
+#include "def_macro.h"
 static int Number(toks_t *toks, const char **s)
 {
 	assert(toks);
@@ -113,7 +113,7 @@ static int Number(toks_t *toks, const char **s)
 
 	return 1;
 }
-#include "MacroUndef.h"
+#include "undef_macro.h"
 
 static int Ident(toks_t *toks, const char **s)
 {

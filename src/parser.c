@@ -1,69 +1,5 @@
-#include "NCC.h"
+#include "ncc.h"
 
-/* some ideas */
-
-/*
-Parse ::= DeclFunc+ 'EOF'
-Op ::= CallFunc ';' | Assign ';' | Return ';' | Pass ';' | Break ';' | Continue ';' | If | While | Asm ';' | '{' Op+ '}'
-
-DeclFunc ::= 'func' '.' '(' {Var ','}* ')' Op
-CallFunc ::= . '(' {OrExpr','}* ')'
-
-Return ::= 'return' OrExpr
-Pass ::= 'pass'
-Break ::= 'break'
-Continue ::= 'continue'
-If ::= 'if' '(' OrExpr ')' Op {'else' Op}
-While ::= 'while' '(' OrExpr ')' Op {'else' Op}
-	while-else still is not implemented
-//For ::= Var '~' ['[''('] Var | Num [']'')'] Op {'else' Op}
-Asm ::= 'asm' '(' '"'.'"' ')'
-
-Assign ::= Var '=' OrExpr
-
-OrExpr ::= AndExpr{['or']AndExpr}*
-AndExpr ::= CompExpr{['and']CompExpr}*
-CompExpr ::= Expr{['<''>''==']Expr}
-Expr ::= Temp{['+''-']Temp}*
-Temp ::= Prim{['*''/']Prim}*
-Prim ::= '(' OrExpr ')' | CallFunc | Num | VarExpr
-
-VarExpr ::= Varadr | deref | Var
-
-Varadr ::= '&' Var
-Deref ::= '[' OrExpr ']'
-
-Num ::= ['0'-'9']+
-Var ::= ['A'-'Z', 'a'-'z', '0'-'9', '_']+
-*/
-
-/*
-while(...)
-{
-
-} else
-{
-
-}
-
-for i ~ (1, 10]
-{
-
-}
-
-do
-{
-
-} while(...)
-
-do
-{
-
-} for i ~ [0, 10)
-
-asm("mov rax, rbx");
-
-*/
 
 static alerts_t ALERTS = {};
 
@@ -193,7 +129,7 @@ static int PrintAlerts(const char *filename)	/* returns 1 if compilation errors 
 	return has_err;
 }
 /*-------------------------------------------*/
-#include "MacroDef.h"
+#include "def_macro.h"
 /*-------------------------------------------*/
 node_t *Parse(toks_t *toks, const char *filename)
 {
@@ -796,4 +732,4 @@ static node_t *GetVar(node_data_t *data[], nametbl_t *nametbl)
 	return NULL;
 }
 /*-------------------------------------------*/
-#include "MacroUndef.h"
+#include "undef_macro.h"

@@ -1,4 +1,4 @@
-#include "NCC.h"
+#include "ncc.h"
 
 /* used in macros 'LEAVE_IF_ERR' and 'err_exit_msg' */
 static int COMPILE_STATUS = 0;	/* 0 - normal, 1 - error */
@@ -58,7 +58,7 @@ static void GnrtDeref(const node_t *tree, const size_t n_var);
 
 static size_t GetMaxID(const node_t *tree);
 /*---------------------------------------------*/
-#include "MacroDef.h"
+#include "def_macro.h"
 /*---------------------------------------------*/
 int CompileTree(const node_t *tree, FILE *asm_out)
 {
@@ -740,5 +740,5 @@ static size_t GetMaxID(const node_t *tree)
 	return max_id + 1;
 }
 /*---------------------------------------------*/
-#include "MacroUndef.h"
+#include "undef_macro.h"
 /*---------------------------------------------*/

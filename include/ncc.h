@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NCC_H
+#define NCC_H
 
 #include <stdio.h>
 #include <assert.h>
@@ -8,7 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <ctype.h>
-#include "Colors.h"
+#include "colors.h"
 
 typedef enum node_type_t
 {
@@ -121,7 +122,7 @@ typedef struct toks_t
 
 } toks_t;
 
-#include "MacroDef.h"
+#include "def_macro.h"
 
 static const lex_t LEXS[] =
 	{
@@ -157,7 +158,7 @@ static const lex_t LEXS[] =
 		{"continue", CONTINUE}
 };
 
-#include "MacroUndef.h"
+#include "undef_macro.h"
 
 typedef enum tree_err_t
 {
@@ -228,3 +229,4 @@ void ToksDestroy(toks_t *toks);
 /* back-end */
 int CompileTree(const node_t *tree, FILE *asm_out);
 
+#endif

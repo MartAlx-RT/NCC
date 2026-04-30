@@ -1,4 +1,4 @@
-#include "NCC.h"
+#include "ncc.h"
 /*---------------------------------------------------------*/
 static const char *NODE_TYPE_NAME[] =
 	{"eof", "root", "number", "operation", "op. sequence", "identifier", "parameters", "variable", "keyword", "symbol", "decl function", "call function", "literal", "&", "[]"};

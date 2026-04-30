@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COLORS_H
+#define COLORS_H
 
 
 #define _RESET_COLORS_ "\033[0m"
@@ -24,3 +25,5 @@ col expr _RESET_COLORS_
 
 #define print_wrg_msg(msg) \
 	fprintf(stderr, colorize(msg, _BOLD_ _MAGENTA_) "\n")
+
+#endif

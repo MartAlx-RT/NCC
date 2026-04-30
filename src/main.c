@@ -1,4 +1,4 @@
-#include "NCC.h"
+#include "ncc.h"
 
 #include <unistd.h>
 

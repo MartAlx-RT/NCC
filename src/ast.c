@@ -1,4 +1,4 @@
-#include "NCC.h"
+#include "ncc.h"
 
 node_t *NewNode(const node_data_t data)
 {

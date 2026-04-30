@@ -1,4 +1,4 @@
-#include "NCC.h"
+#include "ncc.h"
 
 
 size_t ReadFileToBuf(const char *file_path, char **buf)
