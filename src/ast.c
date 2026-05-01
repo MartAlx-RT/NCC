@@ -10,31 +10,32 @@ node_t *NewNode(const node_data_t data)
 	return new_node;
 }
 
-void AddChild(node_t *node, node_t *new_child)
+void AddChild(node_t *node, node_t *new_node)
 {
 	assert(node);
-	assert(new_child);
+	assert(new_node);
 
-	new_child->parent = node;
+	new_node->parent = node;
 
 	if(node->child == NULL)
 	{
 		node->child = (child_t *)calloc(1, sizeof(child_t));
 		assert(node->child);
 
-		node->child->node = new_child;
+		node->child->node = new_node;
+		node->child->prev = node->child;	// prev[0] = itself
 	}
 	else
 	{
-		child_t *child = node->child;
-		while (child->next)
-			child = child->next;
+		child_t *last = node->child->prev;
 
-		child->next = (child_t *)calloc(1, sizeof(child_t));
-		assert(child->next);
+		last->next = (child_t *)calloc(1, sizeof(child_t));
+		assert(last->next);
 
-		child->next->node = new_child;
-		child->next->prev = child;
+		last->next->node = new_node;
+		last->next->prev = last;
+
+		node->child->prev = last->next;		// last = last->next
 	}
 }
 

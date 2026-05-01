@@ -5,9 +5,14 @@
 #include <assert.h>
 #include <malloc.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <sys/types.h>
 #include <math.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <ctype.h>
 #include "colors.h"
 
@@ -104,7 +109,7 @@ typedef struct node_t
 typedef struct child_t
 {
 	node_t *node;
-	struct child_t *prev, *next;
+	struct child_t *prev, *next;	// prev[first_child] -> last_child
 	
 } child_t;
 

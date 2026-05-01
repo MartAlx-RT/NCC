@@ -25,7 +25,7 @@ size_t ReadFileToBuf(const char *file_path, char **buf)
     
     size_t buf_size = (size_t)file_info.st_size;
 
-    *buf = (char *)calloc((size_t)buf_size + 2, sizeof(char));
+    *buf = (char *)calloc(buf_size + 2, sizeof(char));
 	if(*buf == NULL)
 	{
 		print_err_msg("buffer overflow");

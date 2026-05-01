@@ -1,5 +1,7 @@
 #include "ncc.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
 /*---------------------------------------------------------*/
 static const char *NODE_TYPE_NAME[] =
@@ -27,41 +29,41 @@ static void PrintNodeData(const node_data_t data, FILE *out_file)
 
 	switch(data.type)
 	{
-	case TP_EOF:
-		data_s = "EOF";
-		break;
-	case TP_KWORD:
-		data_s = KWORD_NAME[(int)data.val.kword];
-		break;
-	case TP_NUM:
-		data_s = NULL;
-		data_num = data.val.num;
-		break;
-	case TP_OP:
-		data_s = OP_NAME[(int)data.val.op];
-		break;
-	case TP_SYMB:
-		data_s = SYMB_NAME[(int)data.val.symb];
-		break;
-	case TP_VAR:
-	case TP_PARAM:
-	case TP_TAKEADDR:
-	case TP_OP_SEQ:
-		data_s = NULL;
-		data_num = (long)data.val.id;
-		break;
-	case TP_CALL_FUNC:
-	case TP_DECL_FUNC:
-	case TP_LITERAL:
-	case TP_IDENT:
-		data_s = data.val.name;
-		break;
-	case TP_DEREF:
-	case TP_ROOT:
-		break;
-	default:
-		data_s = "??";
-		break;
+		case TP_EOF:
+				data_s = "EOF";
+				break;
+		case TP_KWORD:
+				data_s = KWORD_NAME[(int)data.val.kword];
+				break;
+		case TP_NUM:
+				data_s = NULL;
+				data_num = data.val.num;
+				break;
+		case TP_OP:
+				data_s = OP_NAME[(int)data.val.op];
+				break;
+		case TP_SYMB:
+				data_s = SYMB_NAME[(int)data.val.symb];
+				break;
+		case TP_VAR:
+		case TP_PARAM:
+		case TP_TAKEADDR:
+		case TP_OP_SEQ:
+				data_s = NULL;
+				data_num = data.val.id;
+				break;
+		case TP_CALL_FUNC:
+		case TP_DECL_FUNC:
+		case TP_LITERAL:
+		case TP_IDENT:
+				data_s = data.val.name;
+				break;
+		case TP_DEREF:
+		case TP_ROOT:
+				break;
+		default:
+				data_s = "??";
+				break;
 	}
 	
 	if(data_s)
@@ -136,7 +138,19 @@ void TreeDump(const node_t *tree)
 	FILE *dot_file = fopen(DOT_PATH, "w");	assert(dot_file);
 	CreateDigraph(tree, dot_file);
 
-	execv("/bin/dot", (char *const[]){ "bin/dot", DOT_PATH, "-Tsvg", "-o", "dump.svg", NULL });
+	pid_t pid = fork();
+
+	if(pid < 0)
+		perror("fork");
+	else if(pid == 0)
+		execv("/bin/dot", (char *const[]){ "bin/dot", DOT_PATH, "-Tsvg", "-o", "dump.svg", NULL });
+	else
+	{
+		int status = 0;
+		waitpid(pid, &status, 0);
+
+		if(WEXITSTATUS(status))	fprintf(stderr, "dump failed\n");
+	}	
 }
 
 void PrintToks(node_data_t data[], FILE *dump_file, size_t limit)

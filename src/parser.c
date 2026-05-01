@@ -77,7 +77,7 @@ static ssize_t TblAddVar(const char *name, symtbl_t *symtbl, const symtbl_env_t 
 	if(vartype == SYMTBL_ENV_LOCAL)
 	{
 			// if tbl isn't empty and prev var wasn't function's arg
-		if(symtbl->size && symtbl->cell[symtbl->size-1].id > 0)
+		if(symtbl->size && symtbl->cell[symtbl->size-1].id < 0)
 			symtbl->cell[symtbl->size].id = symtbl->cell[symtbl->size-1].id - 1;
 		else	// otherwise (empty tbl or prev var was arg)
 			symtbl->cell[symtbl->size].id = -1;	// init val
@@ -278,14 +278,14 @@ static node_t *GetDeclFunc(node_data_t *data[])
 			else
 				write_err("is it function declaration? excepted ',' or ')'", (**data).line);
 			
-			node->child->node->data.val.id = symtbl->size;
+			node->child->node->data.val.id = (ssize_t)symtbl->size;
 
 			if((arg_node = GetOp(data, symtbl)))
 				AddChild(node, arg_node);
 			else
 				write_err("excepted function's body", (**data).line);
 
-			node->child->next->node->data.val.id = symtbl->size - node->child->node->data.val.id;
+			node->child->next->node->data.val.id = (ssize_t)symtbl->size - node->child->node->data.val.id;
 		}
 		else
 			write_err("function's signature missing", (**data).line);
@@ -309,7 +309,7 @@ static node_t *GetCallFunc(node_data_t *data[], symtbl_t *symtbl)
 		AddChild(node, NewNode(PARAM));
 		(*data) += 2;
 
-		size_t param_count = 0;
+		ssize_t param_count = 0;
 		while ((arg_node = GetOrExpr(data, symtbl)))
 		{
 			param_count++;
