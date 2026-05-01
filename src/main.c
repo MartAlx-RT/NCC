@@ -4,7 +4,8 @@
 
 /*-------------------------------------------*/
 static inline void PrintUsage(void);
-static int Compile(const char *in_filename, const char *out_filename, const char *out_asm_filename, const int need_asm);
+static int Compile(const char *in_filename, const char *out_filename, const char *out_asm_filename,
+		const int need_asm, const int need_dump);
 /*-------------------------------------------*/
 
 int main(int argc, char *argv[])
@@ -13,26 +14,28 @@ int main(int argc, char *argv[])
 	char *out_asm_filename = NULL;
 	char *out_filename = NULL;
 	int need_asm = 0;
+	int need_dump = 0;
 	int compile_status = 0;
 
 	for (int i = 1; i < argc; i++)
 	{
-		if(strcmp(argv[i], "-o") == 0)
+		if(!strcmp(argv[i], "-o"))
 		{
 			if(++i < argc && out_filename == NULL)
 				out_filename = argv[i];
 		}
-		else if(strcmp(argv[i], "--asm") == 0)
+		else if(!strcmp(argv[i], "--asm"))
 		{
 			need_asm = 1;
 			if (++i < argc && out_asm_filename == NULL)
 				out_asm_filename = argv[i];
 		}
-		else if(strcmp(argv[i], "--help") == 0)
+		else if(!strcmp(argv[i], "--help"))
 		{
 			PrintUsage();
 			goto exit;
 		}
+		else if(!strcmp(argv[i], "--dump"))	need_dump = 1;
 		else if (in_filename == NULL)
 			in_filename = argv[i];
 	}
@@ -49,7 +52,7 @@ int main(int argc, char *argv[])
 	if(out_asm_filename == NULL)
 		out_asm_filename = "asm.out";	/* default name */
 
-	compile_status = Compile(in_filename, out_filename, out_asm_filename, need_asm);
+	compile_status = Compile(in_filename, out_filename, out_asm_filename, need_asm, need_dump);
 
 exit:
 	if(0)	/* turned off */
@@ -74,7 +77,8 @@ static inline void PrintUsage(void)
 }
 
 #define SYS_MSG_SIZE 100
-static int Compile(const char *in_filename, const char *out_filename, const char *out_asm_filename, const int need_asm)
+static int Compile(const char *in_filename, const char *out_filename, const char *out_asm_filename,
+		const int need_asm, const int need_dump)
 {
 	assert(in_filename);
 	assert(out_filename);
@@ -114,7 +118,7 @@ static int Compile(const char *in_filename, const char *out_filename, const char
 		goto err_exit;
 	}
 
-	//TreeDumpHTML(tree, "f.dot", "./Img", "f.html", "AST dump");
+	if(need_dump)	TreeDump(tree);
 	
 	if(CompileTree(tree, output_asm))
 	{

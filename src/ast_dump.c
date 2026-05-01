@@ -1,4 +1,6 @@
 #include "ncc.h"
+#include <stdio.h>
+#include <unistd.h>
 /*---------------------------------------------------------*/
 static const char *NODE_TYPE_NAME[] =
 	{"eof", "root", "number", "operation", "op. sequence", "identifier", "parameters", "variable", "keyword", "symbol", "decl function", "call function", "literal", "&", "[]"};
@@ -13,7 +15,7 @@ static const char *SYMB_NAME[] =
 static void PrintNodeData(const node_data_t data, FILE *out_file);
 static void PrintDigraphNode(const node_t *node, FILE *dot_file, size_t *call_count);
 static void PrintDigraphTree(const node_t *tree, FILE *dot_file);
-static void CreateDigraph(const node_t *tree, const char *dot_file_path);
+static void CreateDigraph(const node_t *tree, FILE *f);
 /*---------------------------------------------------------*/
 
 static void PrintNodeData(const node_data_t data, FILE *out_file)
@@ -112,59 +114,29 @@ static void PrintDigraphTree(const node_t *tree, FILE *dot_file)
 	PrintDigraphNode(tree, dot_file, &call_count);
 }
 
-static void CreateDigraph(const node_t *tree, const char *dot_file_path)
+static void CreateDigraph(const node_t *tree, FILE *f)
 {
-    assert(dot_file_path);
+	assert(f);
 	assert(tree);
 
 	/*--------------------------------------*/
 
-    FILE *dot_file = fopen(dot_file_path, "w");
-	assert(dot_file);
-
-	fprintf(dot_file, "digraph AST\n{\n");
-	PrintDigraphTree(tree, dot_file);
-	putc('}', dot_file);
+	fprintf(f, "digraph AST\n{\n");
+	PrintDigraphTree(tree, f);
+	putc('}', f);
 	
-	fclose(dot_file);
+	fclose(f);
 }
 
-
-void TreeDumpHTML(const node_t *tree, const char *dot_file_path, const char *img_dir_path, const char *html_file_path, const char *caption)
+#define DOT_PATH "/tmp/ncc_dot_dot_dump.dot"
+void TreeDump(const node_t *tree)
 {	
-	if(dot_file_path == NULL || html_file_path == NULL || img_dir_path == NULL || caption == NULL)
-	{
-		print_err_msg("passed nullptr arguments");
-		return;
-	}
+	assert(tree);
 
-	static size_t call_count = 0;
-    FILE *html_file = NULL;
+	FILE *dot_file = fopen(DOT_PATH, "w");	assert(dot_file);
+	CreateDigraph(tree, dot_file);
 
-    if(call_count == 0)
-		remove(html_file_path);
-
-	html_file = fopen(html_file_path, "a+");
-	assert(html_file);
-
-	CreateDigraph(tree, dot_file_path);
-
-	char system_msg[100] = "";
-    snprintf(system_msg, 100, "dot %s -Tsvg -o %s/%lu.svg\n", dot_file_path, img_dir_path, call_count);
-
-    if(system(system_msg))
-	{
-		print_err_msg("build dot failed");
-		goto exit;
-	}
-
-	fprintf(html_file, "<pre>\n\t<h2>%s</h2>\n", caption);
-    fprintf(html_file, "\t<img  src=\"%s/%lu.svg\" alt=\"%s\" width=\"1200px\"/>\n", img_dir_path, call_count, caption);
-    fprintf(html_file, "\t<hr>\n</pre>\n\n");
-    
-exit:
-	fclose(html_file);
-    call_count++;
+	execv("/bin/dot", (char *const[]){ "bin/dot", DOT_PATH, "-Tsvg", "-o", "dump.svg", NULL });
 }
 
 void PrintToks(node_data_t data[], FILE *dump_file, size_t limit)
