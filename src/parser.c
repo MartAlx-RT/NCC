@@ -1,93 +1,119 @@
+#include "colors.h"
 #include "ncc.h"
+#include <stdio.h>
 
+
+typedef enum symtbl_env_t	// enviroment of variables
+{
+	SYMTBL_ENV_FUNCARG,
+	SYMTBL_ENV_LOCAL
+} symtbl_env_t;
 
 static alerts_t ALERTS = {};
 
 /*-------------------------------------------*/
-static nametbl_t *TblInit(void);
-static size_t TblAddName(const char *name, nametbl_t *nametbl);
-static size_t TblGetID(const char *name, nametbl_t *nametbl);
-static void TblDestroy(nametbl_t *nametbl);
+static symtbl_t *TblInit(void);
+static ssize_t TblAddVar(const char *name, symtbl_t *symtbl, const symtbl_env_t vartype);
+
+static ssize_t TblGetID(const char *name, symtbl_t *symtbl, const symtbl_env_t vartype);
+
+static void TblDestroy(symtbl_t *symtbl);
 static node_t *NewBinNode(const node_data_t data, node_t *l_val, node_t *r_val);
 
-static node_t *GetOp(node_data_t *data[], nametbl_t *nametbl);
+static node_t *GetOp(node_data_t *data[], symtbl_t *symtbl);
 static node_t *GetDeclFunc(node_data_t *data[]);
-static node_t *GetCallFunc(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetReturn(node_data_t *data[], nametbl_t *nametbl);
+static node_t *GetCallFunc(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetReturn(node_data_t *data[], symtbl_t *symtbl);
 static node_t *GetSmplKword(node_data_t *data[], const node_data_t kword);	/* simple keyword */
-static node_t *GetWhileIf(node_data_t *data[], nametbl_t *nametbl, const node_data_t while_or_if);
+static node_t *GetWhileIf(node_data_t *data[], symtbl_t *symtbl, const node_data_t while_or_if);
 static node_t *GetAsm(node_data_t *data[]);
-static node_t *GetAssign(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetOrExpr(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetAndExpr(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetCompExpr(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetExpr(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetTemp(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetPrim(node_data_t *data[], nametbl_t *nametbl);
+static node_t *GetAssign(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetOrExpr(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetAndExpr(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetCompExpr(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetExpr(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetTemp(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetPrim(node_data_t *data[], symtbl_t *symtbl);
 
-static node_t *GetVarExpr(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetVarAdr(node_data_t *data[], nametbl_t *nametbl);
-static node_t *GetDeref(node_data_t *data[], nametbl_t *nametbl);
+static node_t *GetVarExpr(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetVarAdr(node_data_t *data[], symtbl_t *symtbl);
+static node_t *GetDeref(node_data_t *data[], symtbl_t *symtbl);
 
-static node_t *GetVar(node_data_t *data[], nametbl_t *nametbl);
+#define __GetVar(data, symtbl, vartype, ...)	_GetVar(data, symtbl, vartype)
+static node_t *_GetVar(node_data_t *data[], symtbl_t *symtbl, const symtbl_env_t vartype);
+#define GetVar(...)				__GetVar(__VA_ARGS__, SYMTBL_ENV_LOCAL)
+
 static node_t *GetNum(node_data_t *data[]);
 /*-------------------------------------------*/
-static nametbl_t *TblInit(void)
-{
-	nametbl_t *nametbl = (nametbl_t *)calloc(1, sizeof(nametbl_t));
-	assert(nametbl);
 
-	return nametbl;
+
+static symtbl_t *TblInit(void)
+{
+	symtbl_t *symtbl = (symtbl_t *)calloc(1, sizeof(symtbl_t));
+	assert(symtbl);
+
+	return symtbl;
 }
 
-static size_t TblAddName(const char *name, nametbl_t *nametbl)
+static ssize_t TblAddVar(const char *name, symtbl_t *symtbl, const symtbl_env_t vartype)
 {
 	assert(name);
-	assert(nametbl);
+	assert(symtbl);
 	
-	if(nametbl->size + 1 >= nametbl->cap)
+	if(symtbl->size + 1 >= symtbl->cap)
 	{
-		nametbl->cap = 2 * (nametbl->size + 1);
-		nametbl->cell = (cell_t *)reallocarray(nametbl->cell, nametbl->cap, sizeof(cell_t));
-		if(nametbl->cell == NULL)
+		symtbl->cap = 2 * (symtbl->size + 1);
+		symtbl->cell = (symtbl_cell_t *)reallocarray(symtbl->cell, symtbl->cap, sizeof(symtbl_cell_t));
+		if(symtbl->cell == NULL)
 		{
 			print_err_msg("nametable overflow");
 			abort();
 		}
 	}
 
-	nametbl->cell[nametbl->size].name = name;
-	
-	if(nametbl->size)
-		nametbl->cell[nametbl->size].id = nametbl->cell[nametbl->size - 1].id + 1;
-	else
-		nametbl->cell[0].id = 0; /* initial id */
+	symtbl->cell[symtbl->size].name = name;
 
-	return nametbl->cell[nametbl->size++].id;
+	// if crnt var isn't a function's arg
+	if(vartype == SYMTBL_ENV_LOCAL)
+	{
+			// if tbl isn't empty and prev var wasn't function's arg
+		if(symtbl->size && symtbl->cell[symtbl->size-1].id > 0)
+			symtbl->cell[symtbl->size].id = symtbl->cell[symtbl->size-1].id - 1;
+		else	// otherwise (empty tbl or prev var was arg)
+			symtbl->cell[symtbl->size].id = -1;	// init val
+	}
+	else	// if crnt var is a func's arg
+	{
+		if(symtbl->size)
+			symtbl->cell[symtbl->size].id = symtbl->cell[symtbl->size-1].id + 1;
+		else
+			symtbl->cell[symtbl->size].id = 2;	// init val
+	}
+
+	return symtbl->cell[symtbl->size++].id;
 }
 
-static size_t TblGetID(const char *name, nametbl_t *nametbl)
+static ssize_t TblGetID(const char *name, symtbl_t *symtbl, const symtbl_env_t vartype)
 {
-	assert(name);
-	assert(nametbl);
+	assert(name);	assert(symtbl);
 
-	for (size_t i = 0; i < nametbl->size; i++)
-		if(strcmp(name, nametbl->cell[i].name) == 0)
-			return nametbl->cell[i].id;
+	for (size_t i = 0; i < symtbl->size; i++)
+		if(strcmp(name, symtbl->cell[i].name) == 0)
+			return symtbl->cell[i].id;
 
-	return TblAddName(name, nametbl);
+	return TblAddVar(name, symtbl, vartype);
 }
 
-static void TblDestroy(nametbl_t *nametbl)
+static void TblDestroy(symtbl_t *symtbl)
 {
-	if(nametbl == NULL)
+	if(symtbl == NULL)
 		return;
 
-	free(nametbl->cell);
-	nametbl->cell = NULL;
-	nametbl->size = nametbl->cap = 0;
+	free(symtbl->cell);
+	symtbl->cell = NULL;
+	symtbl->size = symtbl->cap = 0;
 
-	free(nametbl);
+	free(symtbl);
 }
 
 static node_t *NewBinNode(const node_data_t data, node_t *l_val, node_t *r_val)
@@ -166,11 +192,11 @@ node_t *Parse(toks_t *toks, const char *filename)
 	return node;
 }
 
-static node_t *GetOp(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetOp(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL;
 	node_t *new_node = NULL;
@@ -180,14 +206,14 @@ static node_t *GetOp(node_data_t *data[], nametbl_t *nametbl)
 		(*data)++;
 		node = NewNode(OP_SEQ);
 
-		new_node = GetOp(data, nametbl);
+		new_node = GetOp(data, symtbl);
 		if(new_node == NULL)	/* in general, it isn't necessary... */
 			write_err("excepted operation(s)", (**data).line);
 
 		while(new_node)
 		{
 			AddChild(node, new_node);
-			new_node = GetOp(data, nametbl);
+			new_node = GetOp(data, symtbl);
 		}
 		
 		if(IS_(CLS_BRC, **data))
@@ -195,12 +221,12 @@ static node_t *GetOp(node_data_t *data[], nametbl_t *nametbl)
 		else
 			write_err("missing '}'", (**data).line);
 	}
-	else if((node = GetWhileIf(data, nametbl, IF))	||
-			(node = GetWhileIf(data, nametbl, WHILE)));
+	else if((node = GetWhileIf(data, symtbl, IF))	||
+			(node = GetWhileIf(data, symtbl, WHILE)));
 	else if((node = GetAsm(data))				||
-			(node = GetReturn(data, nametbl))	||
-			(node = GetCallFunc(data, nametbl))	||
-			(node = GetAssign(data, nametbl))	||
+			(node = GetReturn(data, symtbl))	||
+			(node = GetCallFunc(data, symtbl))	||
+			(node = GetAssign(data, symtbl))	||
 			(node = GetSmplKword(data, PASS))	||
 			(node = GetSmplKword(data, BREAK))	||
 			(node = GetSmplKword(data, CONTINUE)))
@@ -220,7 +246,7 @@ static node_t *GetDeclFunc(node_data_t *data[])
 	assert(*data);
 
 	node_t *node = NULL, *arg_node = NULL;
-	nametbl_t *nametbl = NULL;
+	symtbl_t *symtbl = NULL;
 
 	if (IS_(FUNC, **data))
 	{
@@ -231,11 +257,11 @@ static node_t *GetDeclFunc(node_data_t *data[])
 			(*data) += 2;
 			AddChild(node, NewNode(PARAM));
 			
-			nametbl = TblInit();
+			symtbl = TblInit();
 			
 			while((**data).type == TP_IDENT)	/* arguments */
 			{
-				arg_node = GetVar(data, nametbl);
+				arg_node = GetVar(data, symtbl, SYMTBL_ENV_FUNCARG);
 				if(arg_node)
 					AddChild(node->child->node, arg_node);
 				else
@@ -252,26 +278,28 @@ static node_t *GetDeclFunc(node_data_t *data[])
 			else
 				write_err("is it function declaration? excepted ',' or ')'", (**data).line);
 			
-			node->child->node->data.val.id = nametbl->size;
+			node->child->node->data.val.id = symtbl->size;
 
-			if((arg_node = GetOp(data, nametbl)))
+			if((arg_node = GetOp(data, symtbl)))
 				AddChild(node, arg_node);
 			else
 				write_err("excepted function's body", (**data).line);
+
+			node->child->next->node->data.val.id = symtbl->size - node->child->node->data.val.id;
 		}
 		else
 			write_err("function's signature missing", (**data).line);
 	}
 
-	TblDestroy(nametbl);
+	TblDestroy(symtbl);
 	return node;
 }
 
-static node_t *GetCallFunc(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetCallFunc(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL, *arg_node = NULL;
 
@@ -282,7 +310,7 @@ static node_t *GetCallFunc(node_data_t *data[], nametbl_t *nametbl)
 		(*data) += 2;
 
 		size_t param_count = 0;
-		while ((arg_node = GetOrExpr(data, nametbl)))
+		while ((arg_node = GetOrExpr(data, symtbl)))
 		{
 			param_count++;
 			AddChild(node->child->node, arg_node);
@@ -304,11 +332,11 @@ static node_t *GetCallFunc(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetReturn(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetReturn(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL, *arg_node = NULL;
 
@@ -319,7 +347,7 @@ static node_t *GetReturn(node_data_t *data[], nametbl_t *nametbl)
 
 		if(!IS_(SEMICOLON, **data))
 		{
-			arg_node = GetOrExpr(data, nametbl);
+			arg_node = GetOrExpr(data, symtbl);
 			if(arg_node)
 				AddChild(node, arg_node);
 			else
@@ -346,11 +374,11 @@ static node_t *GetSmplKword(node_data_t *data[], const node_data_t kword)
 	return node;
 }
 
-static node_t *GetWhileIf(node_data_t *data[], nametbl_t *nametbl, const node_data_t while_or_if)
+static node_t *GetWhileIf(node_data_t *data[], symtbl_t *symtbl, const node_data_t while_or_if)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL;
 	node_t *new_node = NULL;
@@ -365,7 +393,7 @@ static node_t *GetWhileIf(node_data_t *data[], nametbl_t *nametbl, const node_da
 		{
 			(*data)++;
 			
-			if((new_node = GetOrExpr(data, nametbl)))
+			if((new_node = GetOrExpr(data, symtbl)))
 			{
 				AddChild(node, new_node);
 				
@@ -374,7 +402,7 @@ static node_t *GetWhileIf(node_data_t *data[], nametbl_t *nametbl, const node_da
 				else
 					write_err("missing ')'", (**data).line);
 
-				if((new_node = GetOp(data, nametbl)))
+				if((new_node = GetOp(data, symtbl)))
 					AddChild(node, new_node);
 				else
 					write_err("excepted operations body", (**data).line);
@@ -383,7 +411,7 @@ static node_t *GetWhileIf(node_data_t *data[], nametbl_t *nametbl, const node_da
 				{
 					(*data)++;
 					
-					if((new_node = GetOp(data, nametbl)))
+					if((new_node = GetOp(data, symtbl)))
 						AddChild(node, new_node);
 					else
 						write_err("excepted 'else' operations body", (**data).line);
@@ -434,16 +462,16 @@ static node_t *GetAsm(node_data_t *data[])
 	return node;
 }
 
-static node_t *GetAssign(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetAssign(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL;
 	node_t *new_node = NULL;
 
-	if((new_node = GetVarExpr(data, nametbl)))
+	if((new_node = GetVarExpr(data, symtbl)))
 	{
 		if(IS_(ASSIGN, **data))
 		{
@@ -452,7 +480,7 @@ static node_t *GetAssign(node_data_t *data[], nametbl_t *nametbl)
 			node = NewNode(ASSIGN);
 			AddChild(node, new_node);
 
-			if((new_node = GetOrExpr(data, nametbl)))
+			if((new_node = GetOrExpr(data, symtbl)))
 				AddChild(node, new_node);
 			else
 				write_err("missing rvalue", (**data).line);
@@ -464,13 +492,13 @@ static node_t *GetAssign(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetOrExpr(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetOrExpr(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
-	node_t *node = GetAndExpr(data, nametbl), *new_node = NULL, *arg_node = NULL;
+	node_t *node = GetAndExpr(data, symtbl), *new_node = NULL, *arg_node = NULL;
 	if(node == NULL)
 		return NULL;
 	
@@ -478,7 +506,7 @@ static node_t *GetOrExpr(node_data_t *data[], nametbl_t *nametbl)
 	{
 		(*data)++;
 
-		if((arg_node = GetAndExpr(data, nametbl)))
+		if((arg_node = GetAndExpr(data, symtbl)))
 		{
 			new_node = NewBinNode(OR, node, arg_node);
 			node = new_node;
@@ -490,13 +518,13 @@ static node_t *GetOrExpr(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetAndExpr(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetAndExpr(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
-	node_t *node = GetCompExpr(data, nametbl), *new_node = NULL, *arg_node = NULL;
+	node_t *node = GetCompExpr(data, symtbl), *new_node = NULL, *arg_node = NULL;
 	if(node == NULL)
 		return NULL;
 	
@@ -504,7 +532,7 @@ static node_t *GetAndExpr(node_data_t *data[], nametbl_t *nametbl)
 	{
 		(*data)++;
 
-		if((arg_node = GetCompExpr(data, nametbl)))
+		if((arg_node = GetCompExpr(data, symtbl)))
 		{
 			new_node = NewBinNode(AND, node, arg_node);
 			node = new_node;
@@ -516,13 +544,13 @@ static node_t *GetAndExpr(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetCompExpr(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetCompExpr(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
-	node_t *node = GetExpr(data, nametbl), *arg_node = NULL;
+	node_t *node = GetExpr(data, symtbl), *arg_node = NULL;
 	if(node == NULL)
 		return NULL;
 
@@ -531,7 +559,7 @@ static node_t *GetCompExpr(node_data_t *data[], nametbl_t *nametbl)
 		node_data_t op = **data;
 		(*data)++;
 
-		if((arg_node = GetExpr(data, nametbl)))
+		if((arg_node = GetExpr(data, symtbl)))
 			node = NewBinNode(op, node, arg_node);
 		else
 			write_err("missing expression (right from compare)", (**data).line);
@@ -540,14 +568,14 @@ static node_t *GetCompExpr(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetExpr(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetExpr(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *new_node = NULL, *arg_node = NULL;
-	node_t *node = GetTemp(data, nametbl);
+	node_t *node = GetTemp(data, symtbl);
 	
 	while(IS_(ADD, **data) || IS_(SUB, **data))
 	{
@@ -561,7 +589,7 @@ static node_t *GetExpr(node_data_t *data[], nametbl_t *nametbl)
 		}		
 		AddChild(new_node, node);
 		
-		if((arg_node = GetTemp(data, nametbl)))
+		if((arg_node = GetTemp(data, symtbl)))
 			AddChild(new_node, arg_node);
 		else
 			write_err("missing right expression (from '+' or '-')", (**data).line);
@@ -572,14 +600,14 @@ static node_t *GetExpr(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetTemp(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetTemp(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *new_node = NULL, *arg_node = NULL;
-	node_t *node = GetPrim(data, nametbl);
+	node_t *node = GetPrim(data, symtbl);
 	if(node == NULL)
 		return NULL;
 
@@ -590,7 +618,7 @@ static node_t *GetTemp(node_data_t *data[], nametbl_t *nametbl)
 
 		AddChild(new_node, node);
 		
-		if((arg_node = GetPrim(data, nametbl)))
+		if((arg_node = GetPrim(data, symtbl)))
 			AddChild(new_node, arg_node);
 		else
 			write_err("missing right expression (from '*' or '/')", (**data).line);
@@ -601,18 +629,18 @@ static node_t *GetTemp(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetPrim(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetPrim(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL;
 
 	if(IS_(OPN_PAR, **data))
 	{
 		(*data)++;
-		if((node = GetOrExpr(data, nametbl)))
+		if((node = GetOrExpr(data, symtbl)))
 		{
 			if(IS_(CLS_PAR, **data))
 				(*data)++;
@@ -622,36 +650,36 @@ static node_t *GetPrim(node_data_t *data[], nametbl_t *nametbl)
 		else
 			write_err("missing expression", (**data).line);
 	}
-	else if((node = GetCallFunc(data, nametbl)));
+	else if((node = GetCallFunc(data, symtbl)));
 	else if((node = GetNum(data)));
 	else
-		node = GetVarExpr(data, nametbl);
+		node = GetVarExpr(data, symtbl);
 
 	return node;
 }
 
 
-static node_t *GetVarExpr(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetVarExpr(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL;
 	
-	if((node = GetVarAdr(data, nametbl)));
-	else if((node = GetDeref(data, nametbl)));
+	if((node = GetVarAdr(data, symtbl)));
+	else if((node = GetDeref(data, symtbl)));
 	else
-		node = GetVar(data, nametbl);
+		node = GetVar(data, symtbl);
 
 	return node;
 }
 
-static node_t *GetVarAdr(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetVarAdr(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL;
 
@@ -661,7 +689,7 @@ static node_t *GetVarAdr(node_data_t *data[], nametbl_t *nametbl)
 
 		if ((**data).type == TP_IDENT)
 		{
-			node = NewNode(TAKEADDR(TblGetID((**data).val.name, nametbl)));
+			node = NewNode(TAKEADDR(TblGetID((**data).val.name, symtbl, SYMTBL_ENV_LOCAL)));
 
 			(*data)++;
 		}
@@ -672,11 +700,11 @@ static node_t *GetVarAdr(node_data_t *data[], nametbl_t *nametbl)
 	return node;
 }
 
-static node_t *GetDeref(node_data_t *data[], nametbl_t *nametbl)
+static node_t *GetDeref(node_data_t *data[], symtbl_t *symtbl)
 {
 	assert(data);
 	assert(*data);
-	assert(nametbl);
+	assert(symtbl);
 
 	node_t *node = NULL, *op_node = NULL;
 	
@@ -684,7 +712,7 @@ static node_t *GetDeref(node_data_t *data[], nametbl_t *nametbl)
 	{
 		(*data)++;
 
-		if((op_node = GetOrExpr(data, nametbl)))
+		if((op_node = GetOrExpr(data, symtbl)))
 		{
 			node = NewNode(DEREF);
 			AddChild(node, op_node);
@@ -716,14 +744,14 @@ static node_t *GetNum(node_data_t *data[])
 	return NULL;
 }
 
-static node_t *GetVar(node_data_t *data[], nametbl_t *nametbl)
+static node_t *_GetVar(node_data_t *data[], symtbl_t *symtbl, const symtbl_env_t vartype)
 {
 	assert(data);
 	assert(*data);
 	
 	if((**data).type == TP_IDENT)
 	{
-		node_t *node = NewNode(VAR(TblGetID((**data).val.name, nametbl)));
+		node_t *node = NewNode(VAR(TblGetID((**data).val.name, symtbl, vartype)));
 		
 		(*data)++;
 		return node;

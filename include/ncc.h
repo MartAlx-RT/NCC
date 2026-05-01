@@ -79,7 +79,7 @@ typedef enum symb_t
 typedef union node_val_t
 {
 	char *name;
-	size_t id;
+	ssize_t id;
 	long num;
 	op_t op;
 	symb_t symb;
@@ -169,18 +169,18 @@ typedef enum tree_err_t
 
 } tree_err_t;
 
-typedef struct cell_t
+typedef struct symtbl_cell_t
 {
 	const char *name;
-	size_t id;
-} cell_t;
+	ssize_t id;
+} symtbl_cell_t;
 
-typedef struct nametbl_t
+typedef struct symtbl_t
 {
-	cell_t *cell;
+	symtbl_cell_t *cell;
 	size_t size;
 	size_t cap;
-} nametbl_t;
+} symtbl_t;
 
 #define N_ALERT_LIMIT 50
 

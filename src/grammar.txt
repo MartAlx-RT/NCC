@@ -18,7 +18,7 @@ While ::= 'while' '(' OrExpr ')' Op {'else' Op}
 //For ::= Var '~' ['[''('] Var | Num [']'')'] Op {'else' Op}
 Asm ::= 'asm' '(' '"'.'"' ')'
 
-Assign ::= Var '=' OrExpr
+Assign ::= VarExpr '=' OrExpr
 
 OrExpr ::= AndExpr{['or']AndExpr}*
 AndExpr ::= CompExpr{['and']CompExpr}*

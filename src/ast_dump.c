@@ -46,6 +46,7 @@ static void PrintNodeData(const node_data_t data, FILE *out_file)
 	case TP_VAR:
 	case TP_PARAM:
 	case TP_TAKEADDR:
+	case TP_OP_SEQ:
 		data_s = NULL;
 		data_num = (long)data.val.id;
 		break;
@@ -57,7 +58,6 @@ static void PrintNodeData(const node_data_t data, FILE *out_file)
 		break;
 	case TP_DEREF:
 	case TP_ROOT:
-	case TP_OP_SEQ:
 		break;
 	default:
 		data_s = "??";
