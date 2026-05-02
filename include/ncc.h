@@ -1,6 +1,8 @@
 #ifndef NCC_H
 #define NCC_H
 
+#define NCC_VERSION	"2.0"
+
 #include <stdio.h>
 #include <assert.h>
 #include <malloc.h>

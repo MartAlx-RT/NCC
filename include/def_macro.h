@@ -74,7 +74,7 @@
 			ALERTS.alert[ALERTS.n_alert++] = (const alert_t){.type = AL_ERROR, .msg = m "\n", .line = l}; \
 	} while (0)
 
-#define print_asm(fmt, ...)	fprintf(ASM_OUT, fmt, ##__VA_ARGS__)
+#define write_asm(fmt, ...)	fprintf(ASM_OUT, fmt, ##__VA_ARGS__)
 
 #define IS_(macro, data) ((macro).type == (data).type && !memcmp(&((macro).val), &((data).val), sizeof(node_val_t)))
 
