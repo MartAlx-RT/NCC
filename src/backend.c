@@ -199,9 +199,8 @@ static void GnrtArifm(const node_t *ast)
 		case TP_TAKEADDR:
 			write_asm
 				(
-				 "that isn't implemented!!! mov\trbp, %lu\n"
-				 "add\trbp, rsp\n"
-				 "push\trbp ;&\n\n",
+				 "\tlea\trax, [rbp%+ld*8]\t; <&>\n"
+				 "\tpush\trax\n",
 				 ast->data.val.id
 				);
 			return;
@@ -602,7 +601,7 @@ static void GnrtAssign(const node_t *ast)
 	{
 		write_asm
 			(
-			 "\tpop\tqword [rbp%+ld*8]\t; <assign>\n",
+			 "\tpop\tqword [rbp%+ld*8]\t; <=>\n",
 			 LEFT(ast)->data.val.id
 			);
 	}
@@ -611,9 +610,14 @@ static void GnrtAssign(const node_t *ast)
 		if(!CHILD_EXISTS(LEFT(ast)->child))
 			err_exit_msg("wrong node");
 
-		GnrtExpr(LEFT(ast)->child->node);
-		write_asm("\tisn't implemented!!! pop rbx\n"
-				  "pop [rbx] ;assign [] a value\n\n");
+//		GnrtExpr(LEFT(ast)->child->node);
+		GnrtExpr(LEFT(LEFT(ast)));
+
+		write_asm
+			(
+			 "\tpop\trax\n"
+			 "\tpop\tqword [rax]\t; <[]=>\n"
+			);
 	}
 	else
 		err_exit_msg("lvalue must be variable or dereference ptr");
@@ -707,8 +711,11 @@ static void GnrtDeref(const node_t *ast)
 
 	GnrtExpr(ast->child->node);
 
-	write_asm("isnt implemented!!!\tpop rbp\n"
-			  "push [rbp] ;push deref ptr\n\n");
+	write_asm
+		(
+		 "\tpop\trax\n"
+		 "\tpush\tqword [rax]\t; <[]>\n"
+		);
 }
 /*---------------------------------------------*/
 #include "undef_macro.h"
