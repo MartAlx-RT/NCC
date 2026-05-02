@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	if(out_filename == NULL)
 		out_filename = "a.out";			/* default name */
 	if(out_asm_filename == NULL)
-		out_asm_filename = "asm.out";	/* default name */
+		out_asm_filename = "out.nasm";		/* default name */
 
 	compile_status = Compile(in_filename, out_filename, out_asm_filename, need_asm, need_dump);
 

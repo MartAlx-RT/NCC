@@ -175,14 +175,14 @@ static void GnrtArifm(const node_t *ast)
 	switch(ast->data.type)
 	{
 	case TP_NUM:
-		print_asm("push\t%ld\t; num\n", ast->data.val.num);
+		print_asm("\tpush\t%ld\t; num\n", ast->data.val.num);
 		return;
 	case TP_VAR:
-//		print_asm("mov\trbp, rsp\n"
+//		print_asm("\tmov\trbp, rsp\n"
 //			  "add rbp, %lu ;calculate var pos in stack\n"
 //			  "push [rbp] ;push var\n\n",
 //				  ast->data.val.id);
-		print_asm("push\tqword [rbp%+ld*8]\t; var\n", ast->data.val.id);
+		print_asm("\tpush\tqword [rbp%+ld*8]\t; var\n", ast->data.val.id);
 		return;
 	case TP_DEREF:
 		GnrtDeref(ast);
@@ -205,23 +205,23 @@ static void GnrtArifm(const node_t *ast)
 
 		print_asm
 			(
-			 "pop\trax\n"
-			 "pop\trdx\n"
+			 "\tpop\trax\n"
+			 "\tpop\trdx\n"
 			);
 		switch(ast->data.val.op)
 		{
 			case OP_ADD:
-				print_asm("add\t");
-				return;
+				print_asm("\tadd\t");
+				break;
 			case OP_SUB:
-				print_asm("sub\t");
-				return;
+				print_asm("\tsub\t");
+				break;
 			case OP_MUL:
-				print_asm("imul\t");
-				return;
+				print_asm("\timul\t");
+				break;
 			case OP_DIV:
-				print_asm("that isn't implemented!!! div\n");
-				return;
+				print_asm("\tthat isn't implemented!!! div\n");
+				break;
 			case OP_GREATER:
 			case OP_LESS:
 			case OP_ASSIGN:
@@ -260,15 +260,15 @@ static void GnrtDeclFunc(const node_t *ast)
 
 	print_asm
 		(
-		 "%s:\t; <decl>\n"
-		 "enter\n%ld*8, 0\n",
+		 "\n%s:\t; <decl>\n"
+		 "\tenter\t%ld*8, 0\n",
 		 ast->data.val.name,
 		 ast->child->node->data.val.id + ast->child->next->node->data.val.id
 		);
 
 	GnrtOpSeq(RIGHT(ast));
 	
-	//print_asm("ret\n\n"); /* dubiously */
+	//print_asm("\tret\n\n"); /* dubiously */
 }
 
 static void GnrtAsm(const node_t *ast)
@@ -302,7 +302,7 @@ static void GnrtOr(const node_t *ast)
 	GnrtExpr(RIGHT(ast));
 	GnrtExpr(LEFT(ast));
 
-	print_asm("ins't implemented!!! ;or\n"
+	print_asm("\tins't implemented!!! ;or\n"
 			  "pop rax ;lvalue\n"
 			  "pop rdx ;rvalue\n"
 			  "cmp rax, 0\n"
@@ -336,7 +336,7 @@ static void GnrtAnd(const node_t *ast)
 	GnrtExpr(RIGHT(ast));
 	GnrtExpr(LEFT(ast));
 
-	print_asm("ins't implemented!!! ;and\n"
+	print_asm("\tins't implemented!!! ;and\n"
 			  "pop rax ;lvalue\n"
 			  "pop rdx ;rvalue\n"
 			  "cmp rax, 0\n"
@@ -394,15 +394,15 @@ static void GnrtComp(const node_t *ast, const op_t gle)
 
 	print_asm
 		(
-		 "; <cmp>:\n"
-		 "pop\trax\t; lval\n"
-		 "pop\trdx\t; rval\n"
-		 "cmp\trdx, rax\n"
-		 "%s\t.L%lu\n"
-		 "push\t0\n"
-		 "jmp\t.L%lu\n"
+		 "\t; <cmp>:\n"
+		 "\tpop\trax\t; lval\n"
+		 "\tpop\trdx\t; rval\n"
+		 "\tcmp\trdx, rax\n"
+		 "\t%s\t.L%lu\n"
+		 "\tpush\t0\n"
+		 "\tjmp\t.L%lu\n"
 		 ".L%lu:\n"
-		 "push\t1\n"
+		 "\tpush\t1\n"
 		 ".L%lu:\n",
 		 jmp_type, LBL_CNT,
 		 LBL_CNT + 1,
@@ -491,11 +491,11 @@ static void GnrtIf(const node_t *ast)
 	/* condition */
 	print_asm
 		(
-		 "; <if cnd>:\n"
-		 "pop\trax\n"
-		 "test\trax, rax\n"
-		 "je\t.L%lu\n"
-		 "; <if body>\n",
+		 "\t; <if cnd>:\n"
+		 "\tpop\trax\n"
+		 "\ttest\trax, rax\n"
+		 "\tje\t.L%lu\n"
+		 "\t; <if body>\n",
 		 else_lbl
 		);
 
@@ -509,9 +509,9 @@ static void GnrtIf(const node_t *ast)
 	/* 'else' body */
 	print_asm
 		(
-		 "jmp\t.L%lu\n"
+		 "\tjmp\t.L%lu\n"
 		 ".L%lu:\n"
-		 "; <else body>\n",
+		 "\t; <else body>\n",
 		 endif_lbl, else_lbl
 		);
 
@@ -519,7 +519,7 @@ static void GnrtIf(const node_t *ast)
 		GnrtOpSeq(child->node);
 
 	/* endif */
-	print_asm(".L%lu:\t; <endif>\n", endif_lbl);
+	print_asm("\t.L%lu:\t; <endif>\n", endif_lbl);
 }
 
 static void GnrtWhile(const node_t *ast)
@@ -533,13 +533,13 @@ static void GnrtWhile(const node_t *ast)
 		err_exit_msg("is not binary");
 
 	size_t cond_lbl = LOOP_LBL_CNT++, end_lbl = LOOP_LBL_CNT++;
-	print_asm(";while condition\n"
+	print_asm("\t;while condition\n"
 			  ".Lloop%lu:\n",
 			  cond_lbl);
 
 	GnrtExpr(LEFT(ast));
 
-	print_asm(";check condition\n"
+	print_asm("\t;check condition\n"
 			  "pop rax\n"
 			  "cmp rax, 0\n"
 			  "je .Lloop%lu\n"
@@ -548,7 +548,7 @@ static void GnrtWhile(const node_t *ast)
 
 	GnrtOpSeq(RIGHT(ast));
 
-	print_asm("jmp .Lloop%lu\n"
+	print_asm("\tjmp .Lloop%lu\n"
 			  ";end while\n"
 			  ".Lloop%lu:\n\n",
 			  cond_lbl, end_lbl);
@@ -568,14 +568,14 @@ static void GnrtAssign(const node_t *ast)
 
 	if(LEFT(ast)->data.type == TP_VAR)
 	{
-//		print_asm("mov rbp, rsp\n"
+//		print_asm("\tmov rbp, rsp\n"
 //				  "add rbp, %lu ;calculate var pos in stack\n"
 //				  "pop [rbp] ;assign var a value\n\n",
 //				  LEFT(ast)->data.val.id);
 
 		print_asm
 			(
-			 "pop\tqword [rbp%+ld]\t; assign\n",
+			 "\tpop\tqword [rbp%+ld*8]\t; assign\n",
 			 LEFT(ast)->data.val.id
 			);
 	}
@@ -585,7 +585,7 @@ static void GnrtAssign(const node_t *ast)
 			err_exit_msg("wrong node");
 
 		GnrtExpr(LEFT(ast)->child->node);
-		print_asm("isn't implemented!!! pop rbx\n"
+		print_asm("\tisn't implemented!!! pop rbx\n"
 				  "pop [rbx] ;assign [] a value\n\n");
 	}
 	else
@@ -602,7 +602,7 @@ static void GnrtCallFunc(const node_t *ast)
 	if(ast->child == NULL || ast->child->node == NULL)
 		err_exit_msg("call node without parameters node");
 
-	print_asm("; <call>:\n");
+	print_asm("\t; <call>:\n");
 
 	node_t *param_node = ast->child->node;
 
@@ -612,13 +612,13 @@ static void GnrtCallFunc(const node_t *ast)
 
 		do
 		{
-			print_asm("push\tqword [rbp%+ld]\t; ld func arg\n", param->node->data.val.id);
+			print_asm("\tpush\tqword [rbp%+ld]\t; ld func arg\n", param->node->data.val.id);
 			param = param->prev;
 		}
 		while(param != param_node->child);
 	}
 
-	print_asm("call\t%s\n", ast->data.val.name);
+	print_asm("\tcall\t%s\n", ast->data.val.name);
 
 //	while (param)
 //	{
@@ -631,18 +631,18 @@ static void GnrtCallFunc(const node_t *ast)
 //	}
 //	
 //	/* load parameters to ram stack */
-//	print_asm("mov rbp, rsp\n"
+//	print_asm("\tmov rbp, rsp\n"
 //			  "add rbp, %lu ;last param pos\n",
 //			  n_var + ast->child->node->data.val.id - 1);
 //
 //							/* num of parameters */
 //	for (size_t i = 0; i < ast->child->node->data.val.id; i++) 
 //	{
-//		print_asm("pop [rbp] ;load param\n"
+//		print_asm("\tpop [rbp] ;load param\n"
 //				  "sub rbp, 1\n");
 //	}
 //
-//	print_asm("add rsp, %lu ;shift sp\n"
+//	print_asm("\tadd rsp, %lu ;shift sp\n"
 //			  "call %s\n"
 //			  "sub rsp, %lu ;shift back\n"
 //			  ";-------------\n\n",
@@ -661,8 +661,8 @@ static void GnrtReturn(const node_t *ast)
 	
 	print_asm
 		(
-		 "leave\n"
-		 "ret\n"
+		 "\tleave\n"
+		 "\tret\n"
 		);
 }
 
@@ -673,7 +673,7 @@ static void GnrtBreak(const node_t *ast)
 	if(!IS_(BREAK, ast->data))
 		err_exit_msg("is not 'break'");
 
-	print_asm("jmp .Lloop%lu\t;break\n", LOOP_LBL_CNT - 1);
+	print_asm("\tjmp .Lloop%lu\t;break\n", LOOP_LBL_CNT - 1);
 }
 
 static void GnrtContinue(const node_t *ast)
@@ -683,7 +683,7 @@ static void GnrtContinue(const node_t *ast)
 	if(!IS_(CONTINUE, ast->data))
 		err_exit_msg("is not 'continue'");
 
-	print_asm("jmp .Lloop%lu\t;continue\n", LOOP_LBL_CNT - 2);
+	print_asm("\tjmp .Lloop%lu\t;continue\n", LOOP_LBL_CNT - 2);
 }
 
 static void GnrtDeref(const node_t *ast)
@@ -697,7 +697,7 @@ static void GnrtDeref(const node_t *ast)
 
 	GnrtExpr(ast->child->node);
 
-	print_asm("pop rbp\n"
+	print_asm("\tpop rbp\n"
 			  "push [rbp] ;push deref ptr\n\n");
 }
 /*---------------------------------------------*/
