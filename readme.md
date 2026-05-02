@@ -14,19 +14,19 @@
 ├── `CMakeLists.txt`\
 ├── `include`\
 │   ├── `colors.h`        (цветной вывод ошибок)\
-│   ├── `def\_macro.h`    (\#define макросов)\
+│   ├── `def_macro.h`    (\#define макросов)\
 │   ├── `ncc.h`           (осовной заголовок)\
-│   └── `undef\_macro.h`  (\#undef макросов)\
+│   └── `undef_macro.h`  (\#undef макросов)\
 ├── `readme.md`\
 └── `src`\
     ├── `ast.c`           (функции работы с ast)\
-    ├── `ast\_dump.c`     (генератор дампа ast для `graphviz`)\
+    ├── `ast_dump.c`     (генератор дампа ast для `graphviz`)\
     ├── `backend.c`       (генерация asm-кода)\
     ├── `grammar.txt`     (грамматика парсера)\
     ├── `input.c`         (чтение входных файлов)\
     ├── `main.c`          (cli)\
     ├── `parser.c`        (парсер)\
-    └── `tokenizer.c`     (токенизатор)\
+    └── `tokenizer.c`     (токенизатор)
 
 ## Синтаксис
 ```
