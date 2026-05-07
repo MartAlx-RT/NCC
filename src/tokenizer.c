@@ -5,12 +5,43 @@ static size_t CRNT_LINE = 1;	/* global lines counter */
 	
 /*-------------------------------------------*/
 static void TokRealloc(toks_t *toks);
+static char ReadChar(const char **s);
 static int SkipComments(const char **s);
 static int Lexem(toks_t *toks, const char **s);
 static int Number(toks_t *toks, const char **s);
 static int Ident(toks_t *toks, const char **s);
 static int Literal(toks_t *toks, const char **s);
 /*-------------------------------------------*/
+
+toks_t *Tokenize(const char *s)
+{
+	assert(s);
+
+	toks_t *toks = (toks_t *)calloc(1, sizeof(toks_t));
+	assert(toks);
+
+	while(*s > 0)
+	{
+		TokRealloc(toks);
+
+		if (SkipComments(&s));
+		else if(Lexem(toks, &s));
+		else if(Ident(toks, &s));
+		else if(Number(toks, &s));
+		else if(Literal(toks, &s));
+		else
+		{
+			print_err_msg("syntax error");
+			print_wrong_s(s);
+			ToksDestroy(toks);
+			return NULL;
+		}
+	}
+	TokRealloc(toks);
+	toks->data[toks->size++] = (const node_data_t){.type = TP_EOF};
+
+	return toks;
+}
 
 static void TokRealloc(toks_t *toks)
 {
@@ -26,6 +57,40 @@ static void TokRealloc(toks_t *toks)
 			abort();
 		}
 	}
+}
+
+static char ReadChar(const char **s)
+{
+	assert(s);	assert(*s);
+
+	char c = 0;
+
+	if(**s == '\\')
+	{
+		(*s)++;
+
+		switch(**s)
+		{
+			case '0':	c = 0x0; break;
+			case 'a':	c = 0x7; break;
+			case 'b':	c = 0x8; break;
+			case 't':	c = 0x9; break;
+			case 'n':	c = 0xa; break;
+			case 'v':	c = 0xb; break;
+			case 'f':	c = 0xc; break;
+			case 'r':	c = 0xd; break;
+
+			case '\'':	c = 0x27; break;
+			case '\\':	c = 0x5c; break;
+
+			default:
+					print_err_msg("invalid \\-code");
+					return 0;
+		}
+	}
+	else	c = **s;
+
+	(*s)++;	return c;
 }
 
 static int SkipComments(const char **s)
@@ -99,32 +164,9 @@ static int Number(toks_t *toks, const char **s)
 	if(**s == '\'')
 	{
 		(*s)++;
-		if(**s == '\\')
-		{
-			(*s)++;
 
-			switch(**s)
-			{
-				case '0':	num = 0x0; break;
-				case 'a':	num = 0x7; break;
-				case 'b':	num = 0x8; break;
-				case 't':	num = 0x9; break;
-				case 'n':	num = 0xa; break;
-				case 'v':	num = 0xb; break;
-				case 'f':	num = 0xc; break;
-				case 'r':	num = 0xd; break;
+		num = ReadChar(s);
 
-				case '\'':	num = 0x27; break;
-				case '\\':	num = 0x5c; break;
-
-				default:
-						print_err_msg("invalid \\-code");
-						return 0;
-			}
-		}
-		else	num = **s;
-
-		(*s)++;
 		if(**s != '\'')
 		{
 			print_err_msg("missing '");
@@ -217,36 +259,6 @@ static int Literal(toks_t *toks, const char **s)
 	}
 
 	return 0;
-}
-
-toks_t *Tokenize(const char *s)
-{
-	assert(s);
-
-	toks_t *toks = (toks_t *)calloc(1, sizeof(toks_t));
-	assert(toks);
-
-	while(*s > 0)
-	{
-		TokRealloc(toks);
-
-		if (SkipComments(&s));
-		else if(Lexem(toks, &s));
-		else if(Ident(toks, &s));
-		else if(Number(toks, &s));
-		else if(Literal(toks, &s));
-		else
-		{
-			print_err_msg("syntax error");
-			print_wrong_s(s);
-			ToksDestroy(toks);
-			return NULL;
-		}
-	}
-	TokRealloc(toks);
-	toks->data[toks->size++] = (const node_data_t){.type = TP_EOF};
-
-	return toks;
 }
 
 void ToksDestroy(toks_t *toks)
