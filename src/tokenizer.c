@@ -1,5 +1,6 @@
 #include "colors.h"
 #include "ncc.h"
+#include <malloc.h>
 
 static size_t CRNT_LINE = 1;	/* global lines counter */
 	
@@ -71,17 +72,18 @@ static char ReadChar(const char **s)
 
 		switch(**s)
 		{
-			case '0':	c = 0x0; break;
-			case 'a':	c = 0x7; break;
-			case 'b':	c = 0x8; break;
-			case 't':	c = 0x9; break;
-			case 'n':	c = 0xa; break;
-			case 'v':	c = 0xb; break;
-			case 'f':	c = 0xc; break;
-			case 'r':	c = 0xd; break;
+			case '0':	c = '\0'; break;
+			case 'a':	c = '\a'; break;
+			case 'b':	c = '\b'; break;
+			case 't':	c = '\t'; break;
+			case 'n':	c = '\n'; break;
+			case 'v':	c = '\v'; break;
+			case 'f':	c = '\f'; break;
+			case 'r':	c = '\r'; break;
 
-			case '\'':	c = 0x27; break;
-			case '\\':	c = 0x5c; break;
+			case '\'':	c = '\''; break;
+			case '\\':	c = '\\'; break;
+			case '\"':	c = '\"'; break;
 
 			default:
 					print_err_msg("invalid \\-code");
@@ -234,28 +236,32 @@ static int Literal(toks_t *toks, const char **s)
 	if(**s == '"')
 	{
 		(*s)++;
-		
-		//node_data_t data = (const node_data_t){.type = TP_LITERAL};
-		char *name = NULL;
-		int lit_len = 0;
-		if (sscanf(*s, "%m[^\"]%n", &name, &lit_len) > 0)
+
+		size_t len = 0, cap = 10;
+		char *str = (char *)calloc(cap, sizeof(char));	assert(str);
+
+		while(**s != '"' && **s != '\0')
 		{
-			toks->data[toks->size].line = CRNT_LINE;
-			(*s) += lit_len;
-			if(**s != '"')
+			str[len++] = ReadChar(s);
+
+			if(len >= cap)
 			{
-				print_err_msg("missing '\"'");
-				free(name);
-				return 0;
-			}
-
-			(*s)++;
-
-			toks->data[toks->size].type = TP_LITERAL;
-			toks->data[toks->size].val.name = name;
-			toks->size++;
-			return 1;
+				str = reallocarray(str, (cap *= 2), sizeof(char));
+				assert(str);
+			}	
 		}
+		if(**s != '"')
+		{
+			print_err_msg("missing '\"'");
+			free(str);	return 0;
+		}
+
+		str[len] = '\0';
+		toks->data[toks->size].type = TP_LITERAL;
+		toks->data[toks->size].val.name = str;
+		toks->size++;
+
+		(*s)++;	return 1;
 	}
 
 	return 0;

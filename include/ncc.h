@@ -49,7 +49,6 @@ typedef enum op_t
 	OP_EQ,
 	OP_OR,
 	OP_AND,
-
 	OP_NEQ,
 	OP_MOD,
 } op_t;
@@ -57,18 +56,13 @@ typedef enum op_t
 typedef enum kword_t
 {
 	KW_IF,
-	
 	KW_ELSE,
-	
 	KW_WHILE,
 	KW_FOR,
-	
 	KW_CONTINUE,
 	KW_BREAK,
-	
 	KW_RETURN,
 	KW_PASS,
-	
 	KW_ASM,
 	KW_FUNC,
 } kword_t;
@@ -157,7 +151,6 @@ static const lex_t LEXS[] =
 		{ "%", MOD },
 		{ "or", OR },
 		{ "and", AND },
-		  
 		{ "if", IF },
 		{ "else", ELSE },
 		{ "while", WHILE },

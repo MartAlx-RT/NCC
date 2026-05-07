@@ -25,7 +25,7 @@ AndExpr ::= CompExpr{['and']CompExpr}*
 CompExpr ::= Expr{['<''>''==']Expr}
 Expr ::= Temp{['+''-']Temp}*
 Temp ::= Prim{['*''/']Prim}*
-Prim ::= '(' OrExpr ')' | CallFunc | Num | VarExpr
+Prim ::= '(' OrExpr ')' | CallFunc | Num | VarExpr | Literal
 
 VarExpr ::= Varadr | deref | Var
 

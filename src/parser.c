@@ -26,6 +26,7 @@ static node_t *GetCallFunc(node_data_t *data[], symtbl_t *symtbl);
 static node_t *GetReturn(node_data_t *data[], symtbl_t *symtbl);
 static node_t *GetSmplKword(node_data_t *data[], const node_data_t kword);	/* simple keyword */
 static node_t *GetWhileIf(node_data_t *data[], symtbl_t *symtbl, const node_data_t while_or_if);
+static node_t *GetLiteral(node_data_t *data[]);
 static node_t *GetAsm(node_data_t *data[]);
 static node_t *GetAssign(node_data_t *data[], symtbl_t *symtbl);
 static node_t *GetOrExpr(node_data_t *data[], symtbl_t *symtbl);
@@ -427,12 +428,28 @@ static node_t *GetWhileIf(node_data_t *data[], symtbl_t *symtbl, const node_data
 	return node;
 }
 
+static node_t *GetLiteral(node_data_t *data[])
+{
+	assert(data);	assert(*data);
+
+	node_t *node = NULL;
+
+	if((**data).type == TP_LITERAL)
+	{
+		node = NewNode(**data);
+		(*data)++;
+	}
+
+	return node;
+}
+
 static node_t *GetAsm(node_data_t *data[])
 {
 	assert(data);
 	assert(*data);
 
-	node_t *node = NULL;
+	node_t *node = NULL, *literal_node = NULL;
+
 	if (IS_(ASM, **data))
 	{
 		(*data)++;
@@ -441,11 +458,10 @@ static node_t *GetAsm(node_data_t *data[])
 		{
 			(*data)++;
 			
-			if((**data).type == TP_LITERAL)
+			if((literal_node = GetLiteral(data)))
 			{
 				node = NewNode(ASM);
-				AddChild(node, NewNode(**data));
-				(*data)++;
+				AddChild(node, literal_node);
 			}
 			else
 				write_err("excepted a literal", (**data).line);
@@ -651,9 +667,9 @@ static node_t *GetPrim(node_data_t *data[], symtbl_t *symtbl)
 			write_err("missing expression", (**data).line);
 	}
 	else if((node = GetCallFunc(data, symtbl)));
+	else if((node = GetLiteral(data)));
 	else if((node = GetNum(data)));
-	else
-		node = GetVarExpr(data, symtbl);
+	else	node = GetVarExpr(data, symtbl);
 
 	return node;
 }
