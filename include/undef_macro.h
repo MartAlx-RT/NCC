@@ -11,6 +11,7 @@
 #undef OPN_BRK
 #undef CLS_BRK
 #undef EQ
+#undef NEQ
 #undef ASSIGN
 #undef ADD
 #undef SUB
@@ -18,6 +19,7 @@
 #undef LESS
 #undef MUL
 #undef DIV
+#undef MOD
 #undef OR
 #undef AND
 #undef FUNC

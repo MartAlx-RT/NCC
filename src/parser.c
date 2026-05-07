@@ -554,7 +554,7 @@ static node_t *GetCompExpr(node_data_t *data[], symtbl_t *symtbl)
 	if(node == NULL)
 		return NULL;
 
-	if(IS_(GREATER, **data) || IS_(LESS, **data) || IS_(EQ, **data))
+	if(IS_(GREATER, **data) || IS_(LESS, **data) || IS_(EQ, **data) || IS_(NEQ, **data))
 	{
 		node_data_t op = **data;
 		(*data)++;
@@ -611,7 +611,7 @@ static node_t *GetTemp(node_data_t *data[], symtbl_t *symtbl)
 	if(node == NULL)
 		return NULL;
 
-	while(IS_(MUL, **data) || IS_(DIV, **data))
+	while(IS_(MUL, **data) || IS_(DIV, **data) || IS_(MOD, **data))
 	{
 		new_node = NewNode(**data);
 		(*data)++;
@@ -621,7 +621,7 @@ static node_t *GetTemp(node_data_t *data[], symtbl_t *symtbl)
 		if((arg_node = GetPrim(data, symtbl)))
 			AddChild(new_node, arg_node);
 		else
-			write_err("missing right expression (from '*' or '/')", (**data).line);
+			write_err("missing right expression (from '*', '/', or '%')", (**data).line);
 
 		node = new_node;
 	}

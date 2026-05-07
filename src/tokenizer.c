@@ -1,3 +1,4 @@
+#include "colors.h"
 #include "ncc.h"
 
 static size_t CRNT_LINE = 1;	/* global lines counter */
@@ -93,23 +94,63 @@ static int Number(toks_t *toks, const char **s)
 	assert(s);
 	assert(*s);
 
-	//const char *old_s = *s;
-	char *end_s = NULL;
-	long num = strtol(*s, &end_s, 10);
-	assert(end_s);
+	long num = 0;
 
-	if(isalpha(*end_s) || *end_s == '_')	/* letter or '_' can't follow after number */
-		return 0;
+	if(**s == '\'')
+	{
+		(*s)++;
+		if(**s == '\\')
+		{
+			(*s)++;
 
-	if(end_s == *s)
-		return 0;
+			switch(**s)
+			{
+				case '0':	num = 0x0; break;
+				case 'a':	num = 0x7; break;
+				case 'b':	num = 0x8; break;
+				case 't':	num = 0x9; break;
+				case 'n':	num = 0xa; break;
+				case 'v':	num = 0xb; break;
+				case 'f':	num = 0xc; break;
+				case 'r':	num = 0xd; break;
 
-	//toks->data[toks->size++] = (const node_data_t){.type = TP_NUM, .val.num = num};
+				case '\'':	num = 0x27; break;
+				case '\\':	num = 0x5c; break;
+
+				default:
+						print_err_msg("invalid \\-code");
+						return 0;
+			}
+		}
+		else	num = **s;
+
+		(*s)++;
+		if(**s != '\'')
+		{
+			print_err_msg("missing '");
+			return 0;
+		}
+
+		(*s)++;
+	}
+	else
+	{
+		char *end_s = NULL;
+		num = strtol(*s, &end_s, 10);
+		assert(end_s);
+
+		if(isalpha(*end_s) || *end_s == '_')	/* letter or '_' can't follow after number */
+			return 0;
+
+		if(end_s == *s)
+			return 0;
+
+		*s = end_s;
+	}
+
 	toks->data[toks->size] = NUM(num);
 	toks->data[toks->size].line = CRNT_LINE;
 	toks->size++;
-
-	*s = end_s;
 
 	return 1;
 }

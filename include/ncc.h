@@ -49,6 +49,9 @@ typedef enum op_t
 	OP_EQ,
 	OP_OR,
 	OP_AND,
+
+	OP_NEQ,
+	OP_MOD,
 } op_t;
 
 typedef enum kword_t
@@ -133,36 +136,38 @@ typedef struct toks_t
 
 static const lex_t LEXS[] =
 	{
-		{"{", OPN_BRC},
-		{"}", CLS_BRC},
-		{"(", OPN_PAR},
-		{")", CLS_PAR},
-		{";", SEMICOLON},
-		{",", COMMA},
-		{"&", TAKEADDR(0)},
-		{"[",OPN_BRK},
-		{"]",CLS_BRK},
-		{"==", EQ},
-		{"=", ASSIGN},
-		{"+", ADD},
-		{"-", SUB},
-		{">", GREATER},
-		{"<", LESS},
-		{"*", MUL},
-		{"/", DIV},
-		{"or", OR},
-		{"and", AND},
-		
-		{"if", IF},
-		{"else", ELSE},
-		{"while", WHILE},
-		{"for", FOR},
-		{"asm", ASM},
-		{"func", FUNC},
-		{"return", RETURN},
-		{"pass", PASS},
-		{"break", BREAK},
-		{"continue", CONTINUE}
+		{ "{", OPN_BRC },
+		{ "}", CLS_BRC },
+		{ "(", OPN_PAR },
+		{ ")", CLS_PAR },
+		{ ";", SEMICOLON },
+		{ ",", COMMA },
+		{ "&", TAKEADDR(0) },
+		{ "[", OPN_BRK },
+		{ "]", CLS_BRK },
+		{ "==", EQ },
+		{ "!=", NEQ },
+		{ "=", ASSIGN },
+		{ "+", ADD },
+		{ "-", SUB },
+		{ ">", GREATER },
+		{ "<", LESS },
+		{ "*", MUL },
+		{ "/", DIV },
+		{ "%", MOD },
+		{ "or", OR },
+		{ "and", AND },
+		  
+		{ "if", IF },
+		{ "else", ELSE },
+		{ "while", WHILE },
+		{ "for", FOR },
+		{ "asm", ASM },
+		{ "func", FUNC },
+		{ "return", RETURN },
+		{ "pass", PASS },
+		{ "break", BREAK },
+		{ "continue", CONTINUE }
 };
 
 #include "undef_macro.h"

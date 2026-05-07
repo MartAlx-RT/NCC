@@ -132,9 +132,11 @@ static void GnrtOp(const node_t *ast)
 				case OP_SUB:
 				case OP_MUL:
 				case OP_DIV:
+				case OP_MOD:
 				case OP_GREATER:		/* implemented in GnrtArifm */
 				case OP_LESS:
 				case OP_EQ:
+				case OP_NEQ:
 				case OP_OR:
 				case OP_AND:
 					GnrtArifm(ast);
@@ -214,38 +216,43 @@ static void GnrtArifm(const node_t *ast)
 
 			write_asm
 				(
-				 "\tpop\trdx\n"
+	//			 "\tpop\trdx\n"
+				 "\tpop\trcx\n"
 				 "\tpop\trax\n"
 				);
+
 			switch(ast->data.val.op)
 			{
 				case OP_ADD:
-					write_asm("\tadd");
+					write_asm("\tadd\trax, rcx\n");
 					break;
 				case OP_SUB:
-					write_asm("\tsub");
+					write_asm("\tsub\trax, rcx\n");
 					break;
 				case OP_MUL:
-					write_asm("\timul");
+					write_asm("\timul\trax, rcx\n");
 					break;
 				case OP_DIV:
-					write_asm("that isn't implemented!!! div\n");
+				case OP_MOD:
+					write_asm
+						(
+						 "\txor\trdx, rdx\n"
+						 "\tidiv\trcx\n"
+						);
 					break;
 				case OP_GREATER:
 				case OP_LESS:
 				case OP_ASSIGN:
 				case OP_EQ:			/* implemented in GnrtComp, GnrtAnd, GnrtOr */
+				case OP_NEQ:			/* implemented in GnrtComp, GnrtAnd, GnrtOr */
 				case OP_OR:
 				case OP_AND:
 				default:
 					err_exit_msg("invalid operation");
 			}
 
-			write_asm
-				(
-				 "\trax, rdx\t; <arifm>\n"
-				 "\tpush\trax\n"
-				);
+			if(ast->data.val.op == OP_MOD)	write_asm("\tpush\trdx\t; <%%>\n");
+			else				write_asm("\tpush\trax\t; <arifm>\n");
 
 			return;
 		case TP_EOF:
@@ -395,24 +402,21 @@ static void GnrtComp(const node_t *ast, const op_t gle)
 	const char *jmp_type = NULL;
 	switch(gle)
 	{
-		case OP_GREATER:
-			jmp_type = "ja";
-			break;
-		case OP_LESS:
-			jmp_type = "jb";
-			break;
-		case OP_EQ:
-			jmp_type = "je";
-			break;
+		case OP_GREATER:	jmp_type = "jg"; break;
+		case OP_LESS:		jmp_type = "jl"; break;
+		case OP_EQ:		jmp_type = "je"; break;
+		case OP_NEQ:		jmp_type = "jne"; break;
+
 		case OP_ADD:
 		case OP_SUB:
 		case OP_MUL:
 		case OP_DIV:
+		case OP_MOD:
 		case OP_ASSIGN:
 		case OP_OR:
 		case OP_AND:
-		default:
-			err_exit_msg("jmptype out of range");
+
+		default:		err_exit_msg("jmptype out of range");
 	}
 
 	write_asm
@@ -428,9 +432,9 @@ static void GnrtComp(const node_t *ast, const op_t gle)
 		 "\tpush\t1\n"
 		 ".L%lu:\n",
 		 jmp_type, LBL_CNT,
-		 LBL_CNT + 1,
+		 LBL_CNT+1,
 		 LBL_CNT,
-		 LBL_CNT + 1
+		 LBL_CNT+1
 		);
 
 	LBL_CNT += 2;
@@ -463,6 +467,7 @@ static void GnrtExpr(const node_t *ast)
 				case OP_SUB:
 				case OP_MUL:
 				case OP_DIV:
+				case OP_MOD:
 					GnrtArifm(ast);
 					break;
 				case OP_AND:
@@ -474,6 +479,7 @@ static void GnrtExpr(const node_t *ast)
 				case OP_GREATER:
 				case OP_LESS:
 				case OP_EQ:
+				case OP_NEQ:
 					GnrtComp(ast, ast->data.val.op);
 					break;
 				case OP_ASSIGN:

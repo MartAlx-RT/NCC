@@ -12,6 +12,7 @@
 #define OPN_BRK				(const node_data_t){.type = TP_SYMB, .val.symb = SYM_OPN_BRK}
 #define CLS_BRK				(const node_data_t){.type = TP_SYMB, .val.symb = SYM_CLS_BRK}
 #define EQ 				(const node_data_t){.type = TP_OP, .val.op = OP_EQ}
+#define NEQ 				(const node_data_t){.type = TP_OP, .val.op = OP_NEQ}
 #define ASSIGN 				(const node_data_t){.type = TP_OP, .val.op = OP_ASSIGN}
 #define ADD 				(const node_data_t){.type = TP_OP, .val.op = OP_ADD}
 #define SUB 				(const node_data_t){.type = TP_OP, .val.op = OP_SUB}
@@ -19,6 +20,7 @@
 #define LESS 				(const node_data_t){.type = TP_OP, .val.op = OP_LESS}
 #define MUL 				(const node_data_t){.type = TP_OP, .val.op = OP_MUL}
 #define DIV 				(const node_data_t){.type = TP_OP, .val.op = OP_DIV}
+#define MOD				(const node_data_t){.type = TP_OP, .val.op = OP_MOD}
 #define OR 				(const node_data_t){.type = TP_OP, .val.op = OP_OR}
 #define AND 				(const node_data_t){.type = TP_OP, .val.op = OP_AND}
 #define FUNC				(const node_data_t){.type = TP_KWORD, .val.kword = KW_FUNC}
