@@ -200,6 +200,7 @@ static void GnrtArifm(const node_t *ast)
 			write_asm
 				(
 				 "\tlea\trax, [rbp%+ld*8]\t; <&>\n"
+				 "\tshr\trax, 3\n"
 				 "\tpush\trax\n",
 				 ast->data.val.id
 				);
@@ -607,15 +608,16 @@ static void GnrtAssign(const node_t *ast)
 	}
 	else if(LEFT(ast)->data.type == TP_DEREF)
 	{
-		if(!CHILD_EXISTS(LEFT(ast)->child))
+		node_t *deref_node = LEFT(ast);
+		if(!CHILD_EXISTS(deref_node->child))
 			err_exit_msg("wrong node");
 
-//		GnrtExpr(LEFT(ast)->child->node);
-		GnrtExpr(LEFT(LEFT(ast)));
+		GnrtExpr(deref_node->child->node);
 
 		write_asm
 			(
 			 "\tpop\trax\n"
+			 "\tshl\trax, 3\n"
 			 "\tpop\tqword [rax]\t; <[]=>\n"
 			);
 	}
@@ -714,6 +716,7 @@ static void GnrtDeref(const node_t *ast)
 	write_asm
 		(
 		 "\tpop\trax\n"
+		 "\tshl\trax, 3\n"
 		 "\tpush\tqword [rax]\t; <[]>\n"
 		);
 }

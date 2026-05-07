@@ -706,8 +706,11 @@ static node_t *GetDeref(node_data_t *data[], symtbl_t *symtbl)
 	assert(*data);
 	assert(symtbl);
 
-	node_t *node = NULL, *op_node = NULL;
-	
+	node_t *node = NULL, *op_node = NULL, *bias_var = NULL;
+
+	if((**data).type == TP_IDENT && IS_(OPN_BRK, (*data)[1]))
+		bias_var = GetVar(data, symtbl);
+
 	if(IS_(OPN_BRK, **data))
 	{
 		(*data)++;
@@ -715,10 +718,16 @@ static node_t *GetDeref(node_data_t *data[], symtbl_t *symtbl)
 		if((op_node = GetOrExpr(data, symtbl)))
 		{
 			node = NewNode(DEREF);
-			AddChild(node, op_node);
+
+			if(bias_var)	op_node = NewBinNode(ADD, bias_var, op_node);
+
+			AddChild(node, op_node);				// var to deref
 		}
 		else
+		{
 			write_err("excepted expression in '[]'", (**data).line);
+			free(bias_var);
+		}
 		
 		if(IS_(CLS_BRK, **data))
 			(*data)++;
