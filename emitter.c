@@ -64,27 +64,14 @@ void emit_helloworld(void)
 	write_b(0xb8, 0x3c, 0x00, 0x00, 0x00, 0xbf, 0x34, 0x00, 0x00, 0x00, 0x0f, 0x05);
 }
 
-void emit_mov(const mod_t mod, const operand_t dst, const operand_t src, uint32_t disp)
+void emit_mov(const mov_direction_t direction, const mod_t mod, const reg_t reg, const reg_t base, const uint32_t disp)
 {
-	write_b(0x48);	// rex prefix
+	write_b(0x48, direction, (mod<<6)|(reg<<3)|(base));
 
-	switch(mod)
+	if(mod == MOD_RM_DISP8)		write_b(disp);
+	else if(mod == MOD_RM_DISP32)
 	{
-		case MOD_REG_REG:	write_b(0x89, 0xC0 | (src.reg << 3) | (dst.reg));	break;
-
-		case MOD_REG_MEM:
-					{
-						write_b(0x8b, 0x80 | (dst.reg << 3) | (src.reg));
-
-						bytes32_t bytes = { .num = disp };
-						write_b(bytes.bytes[0], bytes.bytes[1], bytes.bytes[2], bytes.bytes[3]);
-					}
-					break;
-
-					case
-
+		const bytes32_t conv = { .num = disp };
+		write_b(conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
 	}
-
-	// TODO matan after 22:00
-	// TODO all needed emit functions and jumps!!!!
 }
