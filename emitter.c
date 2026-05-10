@@ -1,6 +1,7 @@
 #include "emitter.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/mman.h>
 
 static FILE *NASM = NULL;
@@ -64,14 +65,32 @@ void emit_helloworld(void)
 	write_b(0xb8, 0x3c, 0x00, 0x00, 0x00, 0xbf, 0x34, 0x00, 0x00, 0x00, 0x0f, 0x05);
 }
 
-void emit_mov(const mov_direction_t direction, const mod_t mod, const reg_t reg, const reg_t base, const uint32_t disp)
+void emit_mov(const mov_t direction, const mod_t mod, const reg_t reg, const reg_t base, const uint32_t disp)
 {
 	write_b(0x48, direction, (mod<<6)|(reg<<3)|(base));
 
-	if(mod == MOD_RM_DISP8)		write_b(disp);
-	else if(mod == MOD_RM_DISP32)
+	if(mod == MOD_M_DISP8)		write_b(disp);
+	else if(mod == MOD_M_DISP32)
 	{
 		const bytes32_t conv = { .num = disp };
 		write_b(conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
+	}
+}
+
+void emit_push(const push_t type, const operand_t op)
+{
+	switch(type)
+	{
+		case PUSH_REG:	write_b(type + op.reg);				break;
+		case PUSH_MEM:	write_b(type, (MOD_M<<6)|(6<<3)|(op.reg));	break;
+
+		case PUSH_IMM:
+				{
+					const bytes32_t conv = { .num = op.imm };
+					write_b(0x68, conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
+				}
+				break;
+
+		default:	fprintf(stderr, "type out of range\n");
 	}
 }
