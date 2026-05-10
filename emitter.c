@@ -65,16 +65,28 @@ void emit_helloworld(void)
 	write_b(0xb8, 0x3c, 0x00, 0x00, 0x00, 0xbf, 0x34, 0x00, 0x00, 0x00, 0x0f, 0x05);
 }
 
-void emit_mov(const mov_t direction, const mod_t mod, const reg_t reg, const reg_t base, const uint32_t disp)
+void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const uint32_t disp)
 {
-	write_b(0x48, direction, (mod<<6)|(reg<<3)|(base));
+	write_b(0x48);
 
-	if(mod == MOD_M_DISP8)		write_b(disp);
-	else if(mod == MOD_M_DISP32)
+	if(type == MOV_IMM_TO_REG)
 	{
-		const bytes32_t conv = { .num = disp };
-		write_b(conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
+		const bytes64_t conv = { .num = op.imm };
+		write_b(type+reg, conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3],
+				conv.bytes[4], conv.bytes[5], conv.bytes[6], conv.bytes[7]);
 	}
+	else if(type == MOV_MEM_TO_REG || type == MOV_REG_TO_MEM)
+	{
+		write_b(type, (mod<<6)|(reg<<3)|(op.reg));
+
+		if(mod == MOD_M_DISP8)		write_b(disp);
+		else if(mod == MOD_M_DISP32)
+		{
+			const bytes32_t conv = { .num = disp };
+			write_b(conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
+		}
+	}
+	else	fprintf(stderr, "type out of range\n");
 }
 
 void emit_push(const push_t type, const operand_t op)
@@ -93,4 +105,27 @@ void emit_push(const push_t type, const operand_t op)
 
 		default:	fprintf(stderr, "type out of range\n");
 	}
+}
+
+void emit_enter(const uint16_t shift)
+{
+	const bytes16_t conv = { .num = shift };
+
+	write_b(0xc8, conv.bytes[0], conv.bytes[1], 0x00);
+}
+
+void emit_leave(void)
+{
+	write_b(0xc9);
+}
+
+void emit_ret(void)
+{
+	write_b(0xc3);	// near
+			// far = 0xcb
+}
+
+void emit_syscall(void)
+{
+	write_b(0x0f, 0x05);
 }
