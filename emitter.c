@@ -15,7 +15,8 @@ void emitter_fixup_add_ref(const ref_t ref)
 {
 	if(FIXUPS.refs.size >= FIXUPS.refs.cap)
 	{
-		FIXUPS.refs.refs = (ref_t *)reallocarray(FIXUPS.refs.refs, (FIXUPS.refs.cap *= 2) + 1, sizeof(ref_t));
+		FIXUPS.refs.cap = FIXUPS.refs.cap*2 + 1;
+		FIXUPS.refs.refs = (ref_t *)reallocarray(FIXUPS.refs.refs, FIXUPS.refs.cap, sizeof(ref_t));
 		assert(FIXUPS.refs.refs);
 	}
 
@@ -26,7 +27,8 @@ void emitter_fixup_add_lbl(const lbl_t lbl)
 {
 	if(FIXUPS.lbls.size >= FIXUPS.lbls.cap)
 	{
-		FIXUPS.lbls.lbls = (lbl_t *)reallocarray(FIXUPS.lbls.lbls, (FIXUPS.lbls.cap *= 2) + 1, sizeof(lbl_t));
+		FIXUPS.lbls.cap = FIXUPS.lbls.cap*2 + 1;
+		FIXUPS.lbls.lbls = (lbl_t *)reallocarray(FIXUPS.lbls.lbls, FIXUPS.lbls.cap, sizeof(lbl_t));
 		assert(FIXUPS.lbls.lbls);
 	}
 
@@ -53,23 +55,12 @@ void emitter_fixup(void)
 
 			ssize_t distance = lbl->pos - ref->pos;
 			size_t abs_distance = (distance > 0)? distance : -distance;
+			if(abs_distance >= INT32_MAX)
+				fprintf(stderr, "`%s`: distance is too large\n", lbl->name);
 
-			if(ref->type == FIX_JMP)
-			{
-				if(abs_distance < INT8_MAX)		{ write_b(JMP_REL8, (int8_t)distance); }
-				else if(abs_distance < INT16_MAX)	{ write_b(JMP_REL16);	write_w((int16_t)distance); }
-				else if(abs_distance < INT32_MAX)	{ write_b(JMP_REL32);	write_d((int32_t)distance); }
-				else
-					fprintf(stderr, "`%s`: distance is too large\n", lbl->name);
-			}
-			else if(ref->type == FIX_CALL)
-			{
-				if(abs_distance < INT16_MAX)		{ write_b(CALL_REL16);	write_w(distance); }
-				else if(abs_distance < INT32_MAX)	{ write_b(CALL_REL32);	write_d(distance); }
-				else
-					fprintf(stderr, "`%s`: distance is too large\n", lbl->name);
-			}
-			else	fprintf(stderr, "ref type out of range\n");
+			if(ref->type == FIX_JMP)	{ write_b(JMP_REL32);	write_d((int32_t)distance); }
+			else if(ref->type == FIX_CALL)	{ write_b(CALL_REL32);	write_d(distance); }
+			else				fprintf(stderr, "ref type out of range\n");
 		}
 	}
 
