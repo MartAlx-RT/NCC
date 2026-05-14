@@ -1,4 +1,5 @@
 #include "ncc.h"
+#include <malloc.h>
 
 node_t *NewNode(const node_data_t data)
 {

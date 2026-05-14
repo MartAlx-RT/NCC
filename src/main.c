@@ -1,6 +1,7 @@
 #include "ncc.h"
-
-#include <unistd.h>
+#include "def_perror.h"
+#include <string.h>
+#include <malloc.h>
 
 /*-------------------------------------------*/
 static inline void PrintUsage(void);
@@ -55,11 +56,11 @@ int main(int argc, char *argv[])
 	compile_status = Compile(in_filename, out_filename, out_asm_filename, need_asm, need_dump);
 
 exit:
-	if(0)	/* turned off */
-	{
-		sleep(1);
-		system("tiv ./Img/funnyded.jpg"); /* easter egg =) */
-	}
+//	if(0)	/* turned off */
+//	{
+//		sleep(1);
+//		system("tiv ./Img/funnyded.jpg"); /* easter egg =) */
+//	}
 
 	return compile_status;
 }

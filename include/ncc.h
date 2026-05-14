@@ -5,18 +5,15 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <malloc.h>
-#include <stdlib.h>
+// #include <malloc.h>
+// #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/types.h>
-#include <math.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <ctype.h>
-#include "colors.h"
+// #include <string.h>
+// #include <sys/stat.h>
+// #include <sys/wait.h>
+// #include <unistd.h>
 
 typedef enum node_type_t
 {
@@ -126,7 +123,7 @@ typedef struct toks_t
 
 } toks_t;
 
-#include "def_macro.h"
+#include "def_grammar.h"
 
 static const lex_t LEXS[] =
 	{
@@ -163,7 +160,7 @@ static const lex_t LEXS[] =
 		{ "continue", CONTINUE }
 };
 
-#include "undef_macro.h"
+#include "undef_macros.h"
 
 typedef enum tree_err_t
 {

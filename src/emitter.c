@@ -5,11 +5,55 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define ABS(x)	(((x) > 0)? (x):(-(x)))
+// TODO
+// make code pretty
+// add shl, shr
+// add other needed emits
+//
 
 static FILE *NASM = NULL;
 static FILE *ELF = NULL;
 static fixups_t FIXUPS = {};
+
+/* common functions */ 
+
+void emitter_init(FILE *nasm, FILE *elf)
+{
+	assert(nasm);	assert(elf);
+	ELF = elf;	NASM = nasm;
+
+	int templ_fd = open("/home/alex/Cprojects/NCC/bin/template", O_RDONLY);
+	assert(templ_fd > 0);
+
+	struct stat templ_finfo = {};	fstat(templ_fd, &templ_finfo);
+	char *templ = (char *)mmap(NULL, templ_finfo.st_size, PROT_READ, MAP_PRIVATE, templ_fd, 0);
+	assert(templ);
+
+	size_t chck_fwrite = fwrite(templ, sizeof(char), templ_finfo.st_size, ELF);
+
+	munmap(templ, templ_finfo.st_size);	close(templ_fd);
+	templ = 0;	templ_fd = 0;
+
+	if(chck_fwrite != (size_t)templ_finfo.st_size)	{ perror("fwrite"); return; }
+
+	fseek(ELF, 0x138, SEEK_SET);
+}
+
+void emitter_deinit(void)
+{
+	free(FIXUPS.refs.refs);	FIXUPS.refs.refs = NULL;
+	free(FIXUPS.lbls.lbls);	FIXUPS.lbls.lbls = NULL;
+
+	FIXUPS.refs.cap = FIXUPS.refs.size = 0;
+	FIXUPS.lbls.cap = FIXUPS.lbls.size = 0;
+
+	NASM = ELF = NULL;
+}
+
+size_t emitter_get_elf_pos(void)
+{
+	return ftell(ELF);
+}
 
 void emitter_fixup_add_ref(const ref_t ref)
 {
@@ -67,41 +111,7 @@ void emitter_fixup(void)
 	elf_seek_end();
 }
 
-void emitter_init(FILE *nasm, FILE *elf)
-{
-	assert(nasm);	assert(elf);
-	ELF = elf;	NASM = nasm;
-
-	int templ_fd = open("/home/alex/Cprojects/NCC/bin/template", O_RDONLY);
-	assert(templ_fd > 0);
-
-	struct stat templ_finfo = {};	fstat(templ_fd, &templ_finfo);
-	char *templ = (char *)mmap(NULL, templ_finfo.st_size, PROT_READ, MAP_PRIVATE, templ_fd, 0);
-	assert(templ);
-
-	size_t chck_fwrite = fwrite(templ, sizeof(char), templ_finfo.st_size, ELF);
-
-	munmap(templ, templ_finfo.st_size);	close(templ_fd);
-	templ = 0;	templ_fd = 0;
-
-	if(chck_fwrite != (size_t)templ_finfo.st_size)	{ perror("fwrite"); return; }
-
-	fseek(ELF, 0x138, SEEK_SET);
-}
-
-void emit_gavno(void)
-{
-	write_b('g', 'a', 'v', 'n', 'o');
-}
-
-void emit_helloworld(void)
-{
-	// b83c 0000 00bf 3400 0000 0f05
-
-	write_b(0xb8, 0x3c, 0x00, 0x00, 0x00, 0xbf, 0x34, 0x00, 0x00, 0x00, 0x0f, 0x05);
-}
-
-
+/* emit instruction functions */
 
 void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const uint32_t disp)
 {
@@ -109,22 +119,14 @@ void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_
 
 	if(type == MOV_IMM_TO_REG)
 	{
-//		const bytes64_t conv = { .num = op.imm };
-//		write_b(type+reg, conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3],
-//				conv.bytes[4], conv.bytes[5], conv.bytes[6], conv.bytes[7]);
-		write_b(type+reg);	write_q(op.imm);
+		write_b(type + reg);	write_q(op.imm);
 	}
 	else if(type == MOV_MEM_TO_REG || type == MOV_REG_TO_MEM)
 	{
 		write_b(type, (mod<<6)|(reg<<3)|(op.reg));
 
 		if(mod == MOD_M_DISP8)		write_b(disp);
-		else if(mod == MOD_M_DISP32)
-		{
-//			const bytes32_t conv = { .num = disp };
-//			write_b(conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
-			write_d(disp);
-		}
+		else if(mod == MOD_M_DISP32)	write_d(disp);
 	}
 	else	fprintf(stderr, "mov type out of range\n");
 }
@@ -135,41 +137,10 @@ void emit_push(const push_t type, const operand_t op)
 	{
 		case PUSH_REG:	write_b(type + op.reg);				break;
 		case PUSH_MEM:	write_b(type, (MOD_M<<6)|(6<<3)|(op.reg));	break;
-
-		case PUSH_IMM:
-				{
-//					const bytes32_t conv = { .num = op.imm };
-//					write_b(type, conv.bytes[0], conv.bytes[1], conv.bytes[2], conv.bytes[3]);
-					write_b(type);	write_d(op.imm);
-				}
-				break;
+		case PUSH_IMM:	write_b(type);	write_d(op.imm);		break;
 
 		default:	fprintf(stderr, "push type out of range\n");
 	}
-}
-
-void emit_enter(const uint16_t shift)
-{
-	const bytes16_t conv = { .num = shift };
-
-//	write_b(0xc8, conv.bytes[0], conv.bytes[1], 0x00);
-	write_b(0xc8);	write_w(shift);
-}
-
-void emit_leave(void)
-{
-	write_b(0xc9);
-}
-
-void emit_ret(void)
-{
-	write_b(0xc3);	// near
-			// far = 0xcb
-}
-
-void emit_syscall(void)
-{
-	write_b(0x0f, 0x05);
 }
 
 void emit_abs_branch(const branch_t branch, const operand_t op)
@@ -185,7 +156,6 @@ void emit_rel_branch(const fixup_type_t type, const char *lbl)
 
 	write_b(0x90, 0x90, 0x90, 0x90, 0x90);
 	emitter_fixup_add_ref((const ref_t){ .pos = emitter_get_elf_pos(), .type = type, .name = lbl });
-//	write_n(uint8_t, 0x90, 5);
 }
 
 void emit_lbl(const char *lbl)
@@ -195,21 +165,23 @@ void emit_lbl(const char *lbl)
 	emitter_fixup_add_lbl((const lbl_t){ .pos = emitter_get_elf_pos(), .name = lbl });
 }
 
-size_t emitter_get_elf_pos(void)
+void emit_enter(const uint16_t shift)
 {
-	return ftell(ELF);
+	write_b(0xc8);	write_w(shift);
 }
 
-void emitter_deinit(void)
+void emit_leave(void)
 {
-	free(FIXUPS.refs.refs);	FIXUPS.refs.refs = NULL;
-	free(FIXUPS.lbls.lbls);	FIXUPS.lbls.lbls = NULL;
-
-	FIXUPS.refs.cap = FIXUPS.refs.size = 0;
-	FIXUPS.lbls.cap = FIXUPS.lbls.size = 0;
-
-	NASM = ELF = NULL;
+	write_b(0xc9);
 }
 
-#undef ABS
+void emit_ret(void)
+{
+	write_b(0xc3);
+}
+
+void emit_syscall(void)
+{
+	write_b(0x0f, 0x05);
+}
 

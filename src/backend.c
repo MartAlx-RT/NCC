@@ -1,7 +1,11 @@
 #include "ncc.h"
+#include "def_perror.h"
+#include "def_grammar.h"
+#include "def_emitters.h"
 #include <malloc.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 typedef enum global_type_t
 {
@@ -59,7 +63,6 @@ static void GenContinue(const node_t *ast);
 
 static void GenDeref(const node_t *ast);
 /*---------------------------------------------*/
-#include "def_macro.h"
 /*---------------------------------------------*/
 int CompileTree(const node_t *ast, FILE *asm_out)
 {
@@ -800,6 +803,4 @@ static void GenDeref(const node_t *ast)
 		 "\tpush\tqword [rax]\t; <[]>\n"
 		);
 }
-/*---------------------------------------------*/
-#include "undef_macro.h"
 /*---------------------------------------------*/

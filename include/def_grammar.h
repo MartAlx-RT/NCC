@@ -43,41 +43,5 @@
 #define IS_BINNODE(tr)			(CHILD_EXISTS(tr->child) && CHILD_EXISTS(tr->child->next) && !CHILD_EXISTS(tr->child->next->next))
 #define LEFT(tr)			tr->child->node
 #define RIGHT(tr)			tr->child->next->node
-
-#define LEAVE_IF_ERR    \
-	if (COMPILE_STATUS) \
-		return;
-
-#define err_exit_msg(msg)   \
-	{                       \
-		print_err_msg(msg); \
-		COMPILE_STATUS = 1; \
-		return;             \
-	}
-
-#define write_ntc(m, l)                                                                                    \
-	do                                                                                                     \
-	{                                                                                                      \
-		if (ALERTS.n_alert < N_ALERT_LIMIT)                                                                \
-			ALERTS.alert[ALERTS.n_alert++] = (const alert_t){.type = AL_NOTICE, .msg = m "\n", .line = l}; \
-	} while (0)
-
-#define write_wrg(m, l)                                                                                     \
-	do                                                                                                      \
-	{                                                                                                       \
-		if (ALERTS.n_alert < N_ALERT_LIMIT)                                                                 \
-			ALERTS.alert[ALERTS.n_alert++] = (const alert_t){.type = AL_WARNING, .msg = m "\n", .line = l}; \
-	} while (0)
-
-#define write_err(m, l)                                                                                   \
-	do                                                                                                    \
-	{                                                                                                     \
-		if (ALERTS.n_alert < N_ALERT_LIMIT)                                                               \
-			ALERTS.alert[ALERTS.n_alert++] = (const alert_t){.type = AL_ERROR, .msg = m "\n", .line = l}; \
-	} while (0)
-
-#define write_asm(fmt, ...)	fprintf(ASM_OUT, fmt, ##__VA_ARGS__)
-
 #define IS_(macro, data) ((macro).type == (data).type && !memcmp(&((macro).val), &((data).val), sizeof(node_val_t)))
-
 

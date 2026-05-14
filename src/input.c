@@ -1,5 +1,7 @@
 #include "ncc.h"
-
+#include "def_perror.h"
+#include <sys/stat.h>
+#include <malloc.h>
 
 size_t ReadFileToBuf(const char *file_path, char **buf)
 {

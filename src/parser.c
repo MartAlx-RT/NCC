@@ -1,7 +1,10 @@
-#include "colors.h"
 #include "ncc.h"
+#include "def_grammar.h"
+#include "def_perror.h"
 #include <stdio.h>
-
+#include <malloc.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef enum symtbl_env_t	// enviroment of variables
 {
@@ -156,7 +159,6 @@ static int PrintAlerts(const char *filename)	/* returns 1 if compilation errors 
 	return has_err;
 }
 /*-------------------------------------------*/
-#include "def_macro.h"
 /*-------------------------------------------*/
 node_t *Parse(toks_t *toks, const char *filename)
 {
@@ -785,4 +787,3 @@ static node_t *_GetVar(node_data_t *data[], symtbl_t *symtbl, const symtbl_env_t
 	return NULL;
 }
 /*-------------------------------------------*/
-#include "undef_macro.h"

@@ -1,6 +1,5 @@
 #include "ncc.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "def_perror.h"
 #include <sys/wait.h>
 #include <unistd.h>
 /*---------------------------------------------------------*/
