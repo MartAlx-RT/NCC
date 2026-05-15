@@ -104,18 +104,18 @@ void emitter_fixup(void)
 		if(lbl == NULL)	fprintf(stderr, "unknown label: `%s`\n", ref->name);
 		else
 		{
-			elf_seek(ref->pos - 5);
-
 			ssize_t distance = lbl->pos - ref->pos;
 			size_t abs_distance = (size_t) ((distance > 0)? distance : -distance);
 			if(abs_distance >= INT32_MAX)
 				fprintf(stderr, "`%s`: distance is too large\n", lbl->name);
 
-			if(ref->type == FIX_JMP)	write_b(JMP_REL32);
-			else if(ref->type == FIX_CALL)	write_b(CALL_REL32);
-			else				fprintf(stderr, "ref type out of range\n");
-
-			write_d((uint32_t)(int32_t)distance);
+			if(ref->type == B_CALL_REL32 || ref->type == B_JMP_REL32)
+				elf_seek(ref->pos - 5);
+			else
+			{
+				elf_seek(ref->pos - 6);	write_b(0x0f);
+			}
+			write_b(ref->type);	write_d((uint32_t)(int32_t)distance);
 		}
 	}
 
@@ -174,16 +174,16 @@ void emit_pop(const pop_t type, mod_t mod, const operand_t op, uint32_t disp)
 	}
 }
 
-void emit_abs_branch(const branch_t branch, const operand_t op)
+void emit_abs_branch(const branch_t type, const operand_t op)
 {
-	write_b((uint8_t)branch, MODRM(6, 4, op.reg));
+	write_b((uint8_t)type, MODRM(6, 4, op.reg));
 }
 
-void emit_rel_branch(const fixup_type_t type, const char *lbl)
+void emit_rel_branch(const branch_t type, const char *lbl)
 {
 	assert(lbl);
 
-	write_b(0x90, 0x90, 0x90, 0x90, 0x90);
+	write_b(0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
 	emitter_fixup_add_ref((const ref_t){ .pos = emitter_get_elf_pos(), .type = type, .name = lbl });
 }
 
@@ -234,13 +234,19 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 			write_b((uint8_t)type, MODRM(MOD_R, dst.reg, src.reg));
 			break;
 
+		/* without unique opcode */
+		case ARIFM_ADD_IMM_TO_REG:
+			write_b(0x83, MODRM(MOD_R, 0, dst.reg), (uint8_t)src.imm);
+			break;
+		case ARIFM_SUB_IMM_TO_REG:
+			write_b(0x83, MODRM(MOD_R, 5, dst.reg), (uint8_t)src.imm);
+			break;
 		case ARIFM_SHL_IMM_TO_REG:
 			write_b(0xc1, MODRM(MOD_R, 4, dst.reg), (uint8_t)src.imm);
 			break;
 		case ARIFM_SHR_IMM_TO_REG:
 			write_b(0xc1, MODRM(MOD_R, 5, dst.reg), (uint8_t)src.imm);
 			break;
-
 		case ARIFM_IMUL_REG_TO_REG:
 			write_b(0x0f, 0xaf, MODRM(MOD_R, dst.reg, src.reg));
 			break;

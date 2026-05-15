@@ -17,22 +17,29 @@
 #define RET			emit_ret()
 #define SYSCALL			emit_syscall()
 
-#define JMP_R(r)		emit_branch(JMP_REL, MOD_R, (const operand_t){ .reg = r })
-#define CALL_R(r)		emit_branch(CALL_REL, MOD_R, (const operand_t){ .reg = r })
-#define JMP_L(l)		emit_rel_branch(FIX_JMP, l)
-#define CALL_L(l)		emit_rel_branch(FIX_CALL, l)
+#define JMP_R(r)		emit_abs_branch(B_JMP_ABS, MOD_R, (const operand_t){ .reg = r })
+#define CALL_R(r)		emit_abs_branch(B_CALL_ABS, MOD_R, (const operand_t){ .reg = r })
+#define JMP_L(l)		emit_rel_branch(B_JMP_REL, l)
+#define CALL_L(l)		emit_rel_branch(B_CALL_REL, l)
 #define LBL(l)			emit_lbl(l)
+
+#define JE(l)			emit_rel_branch(B_JE, l)
+#define JNE(l)			emit_rel_branch(B_JNE, l)
+#define JG(l)			emit_rel_branch(B_JG, l)
+#define JL(l)			emit_rel_branch(B_JL, l)
 
 /* arifmetics
  * void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 */
 #define ADD_RR(dst, src)	emit_arifm(ARIFM_ADD_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
+#define ADD_RI(dst, i)		emit_arifm(ARIFM_ADD_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
 #define SUB_RR(dst, src)	emit_arifm(ARIFM_SUB_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
+#define SUB_RI(dst, i)		emit_arifm(ARIFM_SUB_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
 #define IMUL_RR(dst, src)	emit_arifm(ARIFM_IMUL_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
 #define CMP_RR(dst, src)	emit_arifm(ARIFM_CMP_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
 #define IDIV_R(dst, src)	emit_arifm(ARIFM_IDIV_REG_TO_REG, 0, (const operand_t){ .reg = src })
-#define SHL_RR(dst, c)		emit_arifm(ARIFM_SHL_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
-#define SHR_RR(dst, c)		emit_arifm(ARIFM_SHR_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
+#define SHL_RI(dst, c)		emit_arifm(ARIFM_SHL_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
+#define SHR_RI(dst, c)		emit_arifm(ARIFM_SHR_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
 
 #define REX_W	0x48
 

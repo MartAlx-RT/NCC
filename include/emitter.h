@@ -48,26 +48,27 @@ typedef enum pop_t
 
 typedef enum branch_t
 {
-	JMP_REL32	= 0xe9,
-	JMP_ABS		= 0xff,
+	B_JMP_REL32	= 0xe9,
+	B_CALL_REL32	= 0xe8,
 
-	CALL_REL32	= 0xe8,
-	CALL_ABS	= 0xff
+	B_JE		= 0x84,
+	B_JNE		= 0x85,
+	B_JG		= 0x8f,
+	B_JL		= 0x8c,
+
+	B_JMP_ABS	= 0xff,
+	B_CALL_ABS	= 0xff
 } branch_t;
-
-typedef enum fixup_type_t
-{
-	FIX_JMP,
-	FIX_CALL
-} fixup_type_t;
 
 typedef enum arifm_t
 {
-	ARIFM_ADD_REG_TO_REG		= 0x3,
-	ARIFM_SUB_REG_TO_REG		= 0x2b,
-	ARIFM_CMP_REG_TO_REG		= 0x3b,
+	ARIFM_ADD_REG_TO_REG	= 0x3,
+	ARIFM_SUB_REG_TO_REG	= 0x2b,
+	ARIFM_CMP_REG_TO_REG	= 0x3b,
 
 	/* not typical instruction */
+	ARIFM_ADD_IMM_TO_REG,
+	ARIFM_SUB_IMM_TO_REG,
 	ARIFM_SHL_IMM_TO_REG,
 	ARIFM_SHR_IMM_TO_REG,
 	ARIFM_IMUL_REG_TO_REG,
@@ -85,7 +86,7 @@ typedef union operand_t
 typedef struct ref_t
 {
 	ssize_t pos;
-	fixup_type_t type;
+	branch_t type;
 	const char *name;
 } ref_t;
 
@@ -127,9 +128,8 @@ void emit_enter(uint16_t shift);
 void emit_leave(void);
 void emit_ret(void);
 void emit_syscall(void);
-void emit_branch(const branch_t type, const mod_t mod, const operand_t op);
 void emit_abs_branch(const branch_t branch, const operand_t op);
-void emit_rel_branch(const fixup_type_t type, const char *lbl);
+void emit_rel_branch(const branch_t type, const char *lbl);
 void emit_lbl(const char *lbl);
 void emit_push(const push_t type, mod_t mod, const operand_t op, uint32_t disp);
 void emit_pop(const pop_t type, mod_t mod, const operand_t op, uint32_t disp);
