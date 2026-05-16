@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 /* enums */
 
@@ -65,6 +66,7 @@ typedef enum arifm_t
 	ARIFM_ADD_REG_TO_REG	= 0x3,
 	ARIFM_SUB_REG_TO_REG	= 0x2b,
 	ARIFM_CMP_REG_TO_REG	= 0x3b,
+	ARIFM_CMP_REG_TO_IMM	= 0x81,
 
 	/* not typical instruction */
 	ARIFM_ADD_IMM_TO_REG,
@@ -79,7 +81,7 @@ typedef enum arifm_t
 
 typedef union operand_t
 {
-	uint64_t imm;
+	int64_t imm;
 	reg_t reg;
 } operand_t;
 
@@ -87,7 +89,7 @@ typedef struct ref_t
 {
 	ssize_t pos;
 	branch_t type;
-	const char *name;
+	char *name;
 } ref_t;
 
 typedef struct refs_t
@@ -99,7 +101,7 @@ typedef struct refs_t
 typedef struct lbl_t
 {
 	ssize_t pos;
-	const char *name;
+	char *name;
 } lbl_t;
 
 typedef struct lbls_t
@@ -115,24 +117,27 @@ typedef struct fixups_t
 } fixups_t;
 
 /* common functions */ 
-void emitter_init(FILE *nasm, FILE *elf);
+void emitter_init(FILE *elf, FILE *nasm);
 void emitter_deinit(void);
+void emitter_free_names(void);
 ssize_t emitter_get_elf_pos(void);
-char *emitter_make_msg(const char *fmt, ...);
+FILE *emitter_get_elf(void);
 void emitter_fixup_add_ref(const ref_t ref);
-void emitter_fixup_add_lbl(const lbl_t lbl);
 void emitter_fixup(void);
+char *emitter_make_msg(const char *fmt, va_list args);
+void emitter_fixup_add_lbl(const lbl_t lbl);
 
 /* emit instruction functions */
-void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const uint32_t disp);
+void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const int32_t disp);
 void emit_enter(uint16_t shift);
 void emit_leave(void);
 void emit_ret(void);
 void emit_syscall(void);
 void emit_abs_branch(const branch_t branch, const operand_t op);
-void emit_rel_branch(const branch_t type, const char *lbl);
-void emit_lbl(const char *lbl);
-void emit_push(const push_t type, mod_t mod, const operand_t op, uint32_t disp);
-void emit_pop(const pop_t type, mod_t mod, const operand_t op, uint32_t disp);
+void emit_rel_branch(const branch_t type, const char *fmt, ...);
+void emit_lbl(const char *fmt, ...);
+void emit_push(const push_t type, mod_t mod, const operand_t op, const int32_t disp);
+void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t disp);
 void emit_arifm(const arifm_t type, operand_t dst, operand_t src);
+void emit_lea(const mod_t mod, const operand_t dst, const operand_t base, const int32_t disp);
 

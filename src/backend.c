@@ -5,6 +5,7 @@
 #include "emitter.h"
 #include <malloc.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -65,9 +66,9 @@ static void GenContinue(const node_t *ast);
 static void GenDeref(const node_t *ast);
 /*---------------------------------------------*/
 /*---------------------------------------------*/
-int CompileTree(const node_t *ast, FILE *asm_out, FILE *elf)
+int CompileTree(const node_t *ast, FILE *elf, FILE *nasm)
 {
-	if(ast == NULL || asm_out == NULL)
+	if(ast == NULL || nasm == NULL)
 	{
 		print_err_msg("nullptr passed as arg(s)");
 		return 1;
@@ -78,8 +79,8 @@ int CompileTree(const node_t *ast, FILE *asm_out, FILE *elf)
 		return 1;
 	}
 
-	ASM_OUT = asm_out;
-	emitter_init(asm_out, elf);
+	ASM_OUT = nasm;
+	emitter_init(elf, nasm);
 
 //	write_asm
 //		(
@@ -121,8 +122,12 @@ int CompileTree(const node_t *ast, FILE *asm_out, FILE *elf)
 	}
 
 //	write_asm("\n\nsection\t.rodata\n");
-	GenGlobals();
+//	GenGlobals();
 //	write_asm("\nsection\t.text\n");
+
+	emitter_fixup();
+	emitter_free_names();
+	emitter_deinit();
 
 	return COMPILE_STATUS;
 }
@@ -150,11 +155,13 @@ static void GenGlobals(void)
 			const char *str = GLOBALS.globals[i].val.name;
 
 //			write_asm("_glob%lu:\n\tdq\t", i);
-			LBL("")
+			LBL("_glob%lu", i);
 
-			while(*str)	write_asm("%ld, ", (long)*str++);
+//			while(*str)	write_asm("%ld, ", (long)*str++);
+			while(*str)	write_q((uint64_t)*str++);
 
-			write_asm("0\n");
+//			write_asm("0\n");
+			write_q(0);
 		}
 		else	err_exit_msg("global's type out of range");
 	}
@@ -231,13 +238,15 @@ static void GenStr(const node_t *ast)
 	assert(ASM_OUT);
 	assert(ast->data.type == TP_LITERAL);
 
-	write_asm
-		(
-		 "\tmov\trax, _glob%lu\t; <str>\n"
-		 "\tshr\trax, 3\n"
-		 "\tpush\trax\n",
-		 NewGlobal((const global_t){ .type = GLOB_STR, .val = ast->data.val })
-		);
+//	write_asm
+//		(
+//		 "\tmov\trax, _glob%lu\t; <str>\n"
+//		 "\tshr\trax, 3\n"
+//		 "\tpush\trax\n",
+//		 NewGlobal((const global_t){ .type = GLOB_STR, .val = ast->data.val })
+//		);
+
+	fprintf(stderr, "string has not implemented yet\n");
 }
 
 static void GenOpSeq(const node_t *ast)
@@ -267,22 +276,27 @@ static void GenArifm(const node_t *ast)
 	switch(ast->data.type)
 	{
 		case TP_NUM:
-			write_asm("\tpush\t%ld\t\n", ast->data.val.num);
+//			write_asm("\tpush\t%ld\t\n", ast->data.val.num);
+			PUSH_I((int32_t)ast->data.val.num);
 			return;
 		case TP_VAR:
-			write_asm("\tpush\tqword [rbp%+ld*8]\t; <var>\n", ast->data.val.id);
+//			write_asm("\tpush\tqword [rbp%+ld*8]\t; <var>\n", ast->data.val.id);
+			PUSH_M(RBP, 8*(int32_t)ast->data.val.id);
 			return;
 		case TP_DEREF:
 			GenDeref(ast);
 			return;
 		case TP_TAKEADDR:
-			write_asm
-				(
-				 "\tlea\trax, [rbp%+ld*8]\t; <&>\n"
-				 "\tshr\trax, 3\n"
-				 "\tpush\trax\n",
-				 ast->data.val.id
-				);
+//			write_asm
+//				(
+//				 "\tlea\trax, [rbp%+ld*8]\t; <&>\n"
+//				 "\tshr\trax, 3\n"
+//				 "\tpush\trax\n",
+//				 ast->data.val.id
+//				);
+			LEA(RAX, RBP, 8*(int32_t)ast->data.val.id);
+			SHR_RI(RAX, 3);
+			PUSH_R(RAX);
 			return;
 		case TP_OP:
 			if(!IS_BINNODE(ast))
@@ -291,30 +305,37 @@ static void GenArifm(const node_t *ast)
 			GenExpr(LEFT(ast));
 			GenExpr(RIGHT(ast));
 
-			write_asm
-				(
-				 "\tpop\trcx\n"
-				 "\tpop\trax\n"
-				);
+//			write_asm
+//				(
+//				 "\tpop\trcx\n"
+//				 "\tpop\trax\n"
+//				);
+			POP_R(RCX);
+			POP_R(RAX);
 
 			switch(ast->data.val.op)
 			{
 				case OP_ADD:
-					write_asm("\tadd\trax, rcx\n");
+//					write_asm("\tadd\trax, rcx\n");
+					ADD_RR(RAX, RCX);
 					break;
 				case OP_SUB:
-					write_asm("\tsub\trax, rcx\n");
+//					write_asm("\tsub\trax, rcx\n");
+					SUB_RR(RAX, RCX);
 					break;
 				case OP_MUL:
-					write_asm("\timul\trax, rcx\n");
+//					write_asm("\timul\trax, rcx\n");
+					IMUL_RR(RAX, RCX);
 					break;
 				case OP_DIV:
 				case OP_MOD:
-					write_asm
-						(
-						 "\txor\trdx, rdx\n"
-						 "\tidiv\trcx\n"
-						);
+//					write_asm
+//						(
+//						 "\txor\trdx, rdx\n"
+//						 "\tidiv\trcx\n"
+//						);
+					MOV_RI(RDX, 0);
+					IDIV_R(RCX);
 					break;
 				case OP_GREATER:
 				case OP_LESS:
@@ -327,8 +348,10 @@ static void GenArifm(const node_t *ast)
 				default:	err_exit_msg("invalid operation");
 			}
 
-			if(ast->data.val.op == OP_MOD)	write_asm("\tpush\trdx\t; <%%>\n");
-			else				write_asm("\tpush\trax\t; <arifm>\n");
+//			if(ast->data.val.op == OP_MOD)	write_asm("\tpush\trdx\t; <%%>\n");
+//			else				write_asm("\tpush\trax\t; <arifm>\n");
+			if(ast->data.val.op == OP_MOD)	PUSH_R(RDX);
+			else				PUSH_R(RAX);
 
 			return;
 		case TP_EOF:
@@ -356,13 +379,16 @@ static void GenDeclFunc(const node_t *ast)
 	if(!IS_BINNODE(ast))
 		err_exit_msg("invalid declaration");
 
-	write_asm
-		(
-		 "\n%s:\t; <decl>\n"
-		 "\tenter\t%ld*8, 0\n",
-		 ast->data.val.name,
-		 ast->child->node->data.val.id + ast->child->next->node->data.val.id
-		);
+//	write_asm
+//		(
+//		 "\n%s:\t; <decl>\n"
+//		 "\tenter\t%ld*8, 0\n",
+//		 ast->data.val.name,
+//		 ast->child->node->data.val.id + ast->child->next->node->data.val.id
+//		);
+	node_t *body = ast->child->node, *args = ast->child->next->node;
+	LBL("%s", ast->data.val.name);
+	ENTER(8*(uint16_t)(body->data.val.id + args->data.val.id));
 
 	GenOpSeq(RIGHT(ast));
 	
@@ -379,12 +405,13 @@ static void GenAsm(const node_t *ast)
 	if(!(ast->child && ast->child->node))
 		err_exit_msg("invalid node");
 
-	write_asm
-		(
-		 "; <asm inline>:\n"
-		 "%s\n",
-		 ast->child->node->data.val.name
-		);
+//	write_asm
+//		(
+//		 "; <asm inline>:\n"
+//		 "%s\n",
+//		 ast->child->node->data.val.name
+//		);
+	fprintf(stderr, "asm has not implemented yet\n");
 }
 
 static void GenOr(const node_t *ast)
@@ -400,27 +427,37 @@ static void GenOr(const node_t *ast)
 	GenExpr(RIGHT(ast));
 	GenExpr(LEFT(ast));
 
-	write_asm
-		(
-		 "\t; <or>:\n"
-		 "\tpop\trax\t; lval\n"
-		 "\tpop\trdx\t; rval\n"
-		 "\ttest\trax, rax\n"
-		 "\tjne\t.L%lu\n"
-		 "\ttest\trdx, rdx\n"
-		 "\tjne\t.L%lu\n"
-		 "\t; <result>:\n"
-		 "\tpush\t0\n"
-		 "\tjmp\t.L%lu\n"
-		 ".L%lu:\n"
-		 "\tpush\t1\n"
-		 ".L%lu:\n",
-		 LBL_CNT,
-		 LBL_CNT,
-		 LBL_CNT + 1,
-		 LBL_CNT,
-		 LBL_CNT + 1
-		);
+//	write_asm
+//		(
+//		 "\t; <or>:\n"
+//		 "\tpop\trax\t; lval\n"
+//		 "\tpop\trdx\t; rval\n"
+//		 "\ttest\trax, rax\n"
+//		 "\tjne\t.L%lu\n"
+//		 "\ttest\trdx, rdx\n"
+//		 "\tjne\t.L%lu\n"
+//		 "\t; <result>:\n"
+//		 "\tpush\t0\n"
+//		 "\tjmp\t.L%lu\n"
+//		 ".L%lu:\n"
+//		 "\tpush\t1\n"
+//		 ".L%lu:\n",
+//		 LBL_CNT,
+//		 LBL_CNT,
+//		 LBL_CNT + 1,
+//		 LBL_CNT,
+//		 LBL_CNT + 1
+//		);
+
+	POP_R(RAX);	POP_R(RDX);
+	CMP_RI(RAX, 0);	JNE(".L%lu", LBL_CNT);
+
+	CMP_RI(RDX, 0);	JNE(".L%lu", LBL_CNT);
+
+	PUSH_I(0);	JMP_L(".L%lu", LBL_CNT+1);
+	LBL(".L%lu", LBL_CNT);
+	PUSH_I(1);
+	LBL(".L%lu", LBL_CNT+1);
 
 	LBL_CNT += 2;
 }
@@ -438,27 +475,38 @@ static void GenAnd(const node_t *ast)
 	GenExpr(RIGHT(ast));
 	GenExpr(LEFT(ast));
 
-	write_asm
-		(
-		 "\t; <and>:\n"
-		 "\tpop\trax\t; lval\n"
-		 "\tpop\trdx\t; rval\n"
-		 "\ttest\trax, rax\n"
-		 "\tje\t.L%lu\n"
-		 "\ttest\trdx, rdx\n"
-		 "\tje\t.L%lu\n"
-		 "\t; <result>:\n"
-		 "\tpush\t1\n"
-		 "\tjmp\t.L%lu\n"
-		 ".L%lu:\n"
-		 "\tpush\t0\n"
-		 ".L%lu:\n",
-		 LBL_CNT,
-		 LBL_CNT,
-		 LBL_CNT + 1,
-		 LBL_CNT,
-		 LBL_CNT + 1
-		);
+//	write_asm
+//		(
+//		 "\t; <and>:\n"
+//		 "\tpop\trax\t; lval\n"
+//		 "\tpop\trdx\t; rval\n"
+//		 "\ttest\trax, rax\n"
+//		 "\tje\t.L%lu\n"
+//		 "\ttest\trdx, rdx\n"
+//		 "\tje\t.L%lu\n"
+//		 "\t; <result>:\n"
+//		 "\tpush\t1\n"
+//		 "\tjmp\t.L%lu\n"
+//		 ".L%lu:\n"
+//		 "\tpush\t0\n"
+//		 ".L%lu:\n",
+//		 LBL_CNT,
+//		 LBL_CNT,
+//		 LBL_CNT + 1,
+//		 LBL_CNT,
+//		 LBL_CNT + 1
+//		);
+
+	POP_R(RAX);	POP_R(RDX);
+
+	CMP_RI(RAX, 0);	JE(".L%lu", LBL_CNT);
+	CMP_RI(RDX, 0);	JE(".L%lu", LBL_CNT);
+
+	PUSH_I(1);	JMP_L(".L%lu", LBL_CNT+1);
+
+	LBL(".L%lu", LBL_CNT);
+	PUSH_I(0);
+	LBL(".L%lu", LBL_CNT+1);
 
 	LBL_CNT += 2;
 }
@@ -475,13 +523,14 @@ static void GenComp(const node_t *ast, const op_t gle)
 	GenExpr(RIGHT(ast));
 	GenExpr(LEFT(ast));
 
-	const char *jmp_type = NULL;
+	POP_R(RAX);	POP_R(RDX);
+	CMP_RR(RAX, RDX);
 	switch(gle)
 	{
-		case OP_GREATER:	jmp_type = "jg"; break;
-		case OP_LESS:		jmp_type = "jl"; break;
-		case OP_EQ:		jmp_type = "je"; break;
-		case OP_NEQ:		jmp_type = "jne"; break;
+		case OP_GREATER:	JG(".L%lu", LBL_CNT);	break;
+		case OP_LESS:		JL(".L%lu", LBL_CNT);	break;
+		case OP_EQ:		JE(".L%lu", LBL_CNT);	break;
+		case OP_NEQ:		JNE(".L%lu", LBL_CNT);	break;
 
 		case OP_ADD:
 		case OP_SUB:
@@ -491,27 +540,31 @@ static void GenComp(const node_t *ast, const op_t gle)
 		case OP_ASSIGN:
 		case OP_OR:
 		case OP_AND:
-
 		default:		err_exit_msg("jmptype out of range");
 	}
 
-	write_asm
-		(
-		 "\t; <cmp>:\n"
-		 "\tpop\trax\t; lval\n"
-		 "\tpop\trdx\t; rval\n"
-		 "\tcmp\trax, rdx\n"
-		 "\t%s\t.L%lu\n"
-		 "\tpush\t0\n"
-		 "\tjmp\t.L%lu\n"
-		 ".L%lu:\n"
-		 "\tpush\t1\n"
-		 ".L%lu:\n",
-		 jmp_type, LBL_CNT,
-		 LBL_CNT+1,
-		 LBL_CNT,
-		 LBL_CNT+1
-		);
+	PUSH_I(0);	JMP_L(".L%lu", LBL_CNT+1);
+
+	LBL(".L%lu", LBL_CNT);
+	PUSH_I(1);
+	LBL(".L%lu", LBL_CNT+1);
+//	write_asm
+//		(
+//		 "\t; <cmp>:\n"
+//		 "\tpop\trax\t; lval\n"
+//		 "\tpop\trdx\t; rval\n"
+//		 "\tcmp\trax, rdx\n"
+//		 "\t%s\t.L%lu\n"
+//		 "\tpush\t0\n"
+//		 "\tjmp\t.L%lu\n"
+//		 ".L%lu:\n"
+//		 "\tpush\t1\n"
+//		 ".L%lu:\n",
+//		 jmp_type, LBL_CNT,
+//		 LBL_CNT+1,
+//		 LBL_CNT,
+//		 LBL_CNT+1
+//		);
 
 	LBL_CNT += 2;
 }
@@ -531,7 +584,8 @@ static void GenExpr(const node_t *ast)
 			break;
 		case TP_CALL_FUNC:
 			GenCallFunc(ast);
-			write_asm("\n\tpush\trax\t\t; <save retval>\n");
+//			write_asm("\n\tpush\trax\t\t; <save retval>\n");
+			PUSH_R(RAX);
 			break;
 		case TP_DEREF:
 			GenDeref(ast);
@@ -597,15 +651,18 @@ static void GenIf(const node_t *ast)
 	size_t else_lbl = LBL_CNT++, endif_lbl = LBL_CNT++;
 	
 	/* condition */
-	write_asm
-		(
-		 "\t; <if cnd>:\n"
-		 "\tpop\trax\n"
-		 "\ttest\trax, rax\n"
-		 "\tje\t.L%lu\n"
-		 "\t; <if body>\n",
-		 else_lbl
-		);
+//	write_asm
+//		(
+//		 "\t; <if cnd>:\n"
+//		 "\tpop\trax\n"
+//		 "\ttest\trax, rax\n"
+//		 "\tje\t.L%lu\n"
+//		 "\t; <if body>\n",
+//		 else_lbl
+//		);
+
+	POP_R(RAX);
+	CMP_RI(RAX, 0);	JE(".L%lu", else_lbl);
 
 	/* 'if' body */
 	if(CHILD_EXISTS(child))
@@ -615,19 +672,23 @@ static void GenIf(const node_t *ast)
 	child = child->next;
 
 	/* 'else' body */
-	write_asm
-		(
-		 "\tjmp\t.L%lu\n"
-		 ".L%lu:\n"
-		 "\t; <else body>\n",
-		 endif_lbl, else_lbl
-		);
+//	write_asm
+//		(
+//		 "\tjmp\t.L%lu\n"
+//		 ".L%lu:\n"
+//		 "\t; <else body>\n",
+//		 endif_lbl, else_lbl
+//		);
+
+	JMP_L(".L%lu", endif_lbl);
+	LBL(".L%lu", else_lbl);
 
 	if(CHILD_EXISTS(child))
 		GenOpSeq(child->node);
 
 	/* endif */
-	write_asm(".L%lu:\t; <endif>\n", endif_lbl);
+//	write_asm(".L%lu:\t; <endif>\n", endif_lbl);
+	LBL(".L%lu", endif_lbl);
 }
 
 static void GenWhile(const node_t *ast)
@@ -642,32 +703,40 @@ static void GenWhile(const node_t *ast)
 
 	size_t cond_lbl = LOOP_LBL_CNT++, end_lbl = LOOP_LBL_CNT++;
 
-	write_asm
-		(
-		 "\t; <while cond>:\n"
-		 ".Lloop%lu:\n",
-		 cond_lbl
-		);
+//	write_asm
+//		(
+//		 "\t; <while cond>:\n"
+//		 ".Lloop%lu:\n",
+//		 cond_lbl
+//		);
+
+	LBL(".Lloop%lu", cond_lbl);
 
 	GenExpr(LEFT(ast));
 
-	write_asm
-		(
-		 "\tpop\trax\n"
-		 "\ttest\trax, rax\n"
-		 "\tje\t.Lloop%lu\n"
-		 "\t; <while body>:\n",
-		 end_lbl
-		);
+//	write_asm
+//		(
+//		 "\tpop\trax\n"
+//		 "\ttest\trax, rax\n"
+//		 "\tje\t.Lloop%lu\n"
+//		 "\t; <while body>:\n",
+//		 end_lbl
+//		);
+
+	POP_R(RAX);
+	CMP_RI(RAX, 0);	JE(".Lloop%lu", end_lbl);
 
 	GenOpSeq(RIGHT(ast));
 
-	write_asm
-		(
-		 "\tjmp\t.Lloop%lu\n"
-		 ".Lloop%lu:\t; <while end>\n",
-		 cond_lbl, end_lbl
-		);
+//	write_asm
+//		(
+//		 "\tjmp\t.Lloop%lu\n"
+//		 ".Lloop%lu:\t; <while end>\n",
+//		 cond_lbl, end_lbl
+//		);
+
+	JMP_L(".Lloop%lu", cond_lbl);
+	LBL(".Lloop%lu", end_lbl);
 }
 
 static void GenAssign(const node_t *ast)
@@ -690,11 +759,12 @@ static void GenAssign(const node_t *ast)
 	/* l_val */
 	if(l_val->data.type == TP_VAR)
 	{
-		write_asm
-			(
-			 "\tpop\tqword [rbp%+ld*8]\t; <=>\n",
-			 l_val->data.val.id
-			);
+//		write_asm
+//			(
+//			 "\tpop\tqword [rbp%+ld*8]\t; <=>\n",
+//			 l_val->data.val.id
+//			);
+		POP_M(RBP, 8*(int32_t)l_val->data.val.id);
 	}
 	else if(l_val->data.type == TP_DEREF)
 	{
@@ -703,12 +773,15 @@ static void GenAssign(const node_t *ast)
 
 		GenExpr(l_val->child->node);
 
-		write_asm
-			(
-			 "\tpop\trax\n"
-			 "\tshl\trax, 3\n"
-			 "\tpop\tqword [rax]\t; <[]=>\n"
-			);
+//		write_asm
+//			(
+//			 "\tpop\trax\n"
+//			 "\tshl\trax, 3\n"
+//			 "\tpop\tqword [rax]\t; <[]=>\n"
+//			);
+		POP_R(RAX);
+		SHL_RI(RAX, 3);
+		POP_M(RAX, 0);
 	}
 	else
 		err_exit_msg("lvalue must be variable or dereference ptr");
@@ -724,7 +797,7 @@ static void GenCallFunc(const node_t *ast)
 	if(ast->child == NULL || ast->child->node == NULL)
 		err_exit_msg("call node without parameters node");
 
-	write_asm("\t; <call>:\n");
+//	write_asm("\t; <call>:\n");
 
 	node_t *param_node = ast->child->node;
 
@@ -743,13 +816,16 @@ static void GenCallFunc(const node_t *ast)
 		}
 	}
 
-	write_asm
-		(
-		 "\tcall\t%s\n"
-		 "\tadd\trsp, %ld*8\t; rstr stack\n",
-		 ast->data.val.name,
-		 param_node->data.val.id
-		);
+//	write_asm
+//		(
+//		 "\tcall\t%s\n"
+//		 "\tadd\trsp, %ld*8\t; rstr stack\n",
+//		 ast->data.val.name,
+//		 param_node->data.val.id
+//		);
+
+	CALL_L("%s", ast->data.val.name);
+	ADD_RI(RSP, 8*(int32_t)param_node->data.val.id);
 }
 
 static void GenReturn(const node_t *ast)
@@ -762,15 +838,19 @@ static void GenReturn(const node_t *ast)
 	if(ast->child && ast->child->node)
 	{
 		GenExpr(ast->child->node);
-		write_asm("\tpop\trax\t\t; <retval>\n");
+//		write_asm("\tpop\trax\t\t; <retval>\n");
+		POP_R(RAX);
 	}
-	else	write_asm("\tmov\trax, 0\t; dflt retval\n");
+//	else	write_asm("\tmov\trax, 0\t; dflt retval\n");
+	else	MOV_RI(RAX, 0);
 
-	write_asm
-		(
-		 "\tleave\n"
-		 "\tret\n"
-		);
+//	write_asm
+//		(
+//		 "\tleave\n"
+//		 "\tret\n"
+//		);
+
+	LEAVE;	RET;
 }
 
 static void GenBreak(const node_t *ast)
@@ -780,7 +860,8 @@ static void GenBreak(const node_t *ast)
 	if(!IS_(BREAK, ast->data))
 		err_exit_msg("is not 'break'");
 
-	write_asm("\tjmp\t.Lloop%lu\t; <break>\n", LOOP_LBL_CNT - 1);
+//	write_asm("\tjmp\t.Lloop%lu\t; <break>\n", LOOP_LBL_CNT - 1);
+	JMP_L(".Lloop%lu", LOOP_LBL_CNT-1);
 }
 
 static void GenContinue(const node_t *ast)
@@ -790,7 +871,8 @@ static void GenContinue(const node_t *ast)
 	if(!IS_(CONTINUE, ast->data))
 		err_exit_msg("is not 'continue'");
 
-	write_asm("\tjmp\t.Lloop%lu\t; <continue>\n", LOOP_LBL_CNT - 2);
+//	write_asm("\tjmp\t.Lloop%lu\t; <continue>\n", LOOP_LBL_CNT - 2);
+	JMP_L(".Lloop%lu", LOOP_LBL_CNT-2);
 }
 
 static void GenDeref(const node_t *ast)
@@ -804,11 +886,15 @@ static void GenDeref(const node_t *ast)
 
 	GenExpr(ast->child->node);
 
-	write_asm
-		(
-		 "\tpop\trax\n"
-		 "\tshl\trax, 3\n"
-		 "\tpush\tqword [rax]\t; <[]>\n"
-		);
+//	write_asm
+//		(
+//		 "\tpop\trax\n"
+//		 "\tshl\trax, 3\n"
+//		 "\tpush\tqword [rax]\t; <[]>\n"
+//		);
+
+	POP_R(RAX);
+	SHL_RI(RAX, 3);
+	PUSH_M(RAX, 0);
 }
 /*---------------------------------------------*/

@@ -9,7 +9,7 @@
 #define PUSH_R(r)		emit_push(PUSH_REG, MOD_R, (const operand_t){ .reg = r }, 0)
 #define PUSH_I(i)		emit_push(PUSH_IMM, MOD_R, (const operand_t){ .imm = i }, 0)
 
-#define POP_M(base)		emit_pop(POP_MEM, MOD_M_DISP, (const operand_t){ .reg = base }, disp)
+#define POP_M(base, disp)	emit_pop(POP_MEM, MOD_M_DISP, (const operand_t){ .reg = base }, disp)
 #define POP_R(r)		emit_pop(POP_REG, MOD_R, (const operand_t){ .reg = r }, 0)
 
 #define ENTER(shift)		emit_enter(shift)
@@ -17,18 +17,18 @@
 #define RET			emit_ret()
 #define SYSCALL			emit_syscall()
 
+#define LEA(r, b, disp)		emit_lea(MOD_M_DISP, (const operand_t){ .reg = r }, (const operand_t){ .reg = b }, disp)
+
 #define JMP_R(r)		emit_abs_branch(B_JMP_ABS, MOD_R, (const operand_t){ .reg = r })
 #define CALL_R(r)		emit_abs_branch(B_CALL_ABS, MOD_R, (const operand_t){ .reg = r })
-#define JMP_L(l)		emit_rel_branch(B_JMP_REL, l)
-#define CALL_L(l)		emit_rel_branch(B_CALL_REL, l)
-#define LBL(l)			emit_lbl(l)
+#define LBL(l, ...)		emit_lbl(l, ##__VA_ARGS__)
 
-#define MSG(s, ...)		emitter_make_msg(s, ##__VA_ARGS__)
-
-#define JE(l)			emit_rel_branch(B_JE, l)
-#define JNE(l)			emit_rel_branch(B_JNE, l)
-#define JG(l)			emit_rel_branch(B_JG, l)
-#define JL(l)			emit_rel_branch(B_JL, l)
+#define CALL_L(l, ...)		emit_rel_branch(B_CALL_REL, l, ##__VA_ARGS__)
+#define JMP_L(l, ...)		emit_rel_branch(B_JMP_REL, l, ##__VA_ARGS__)
+#define JE(l, ...)		emit_rel_branch(B_JE, l, ##__VA_ARGS__)
+#define JNE(l, ...)		emit_rel_branch(B_JNE, l, ##__VA_ARGS__)
+#define JG(l, ...)		emit_rel_branch(B_JG, l, ##__VA_ARGS__)
+#define JL(l, ...)		emit_rel_branch(B_JL, l, ##__VA_ARGS__)
 
 /* arifmetics
  * void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
@@ -39,7 +39,8 @@
 #define SUB_RI(dst, i)		emit_arifm(ARIFM_SUB_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
 #define IMUL_RR(dst, src)	emit_arifm(ARIFM_IMUL_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
 #define CMP_RR(dst, src)	emit_arifm(ARIFM_CMP_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
-#define IDIV_R(dst, src)	emit_arifm(ARIFM_IDIV_REG_TO_REG, 0, (const operand_t){ .reg = src })
+#define CMP_RI(r, i)		emit_arifm(ARIFM_CMP_REG_TO_IMM, (const operand_t){ .reg = r }, (const operand_t){ .imm = i })
+#define IDIV_R(src)		emit_arifm(ARIFM_IDIV_REG, (const operand_t){}, (const operand_t){ .reg = src })
 #define SHL_RI(dst, c)		emit_arifm(ARIFM_SHL_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
 #define SHR_RI(dst, c)		emit_arifm(ARIFM_SHR_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
 
@@ -51,11 +52,10 @@
 #define write_elf(type, ...)								\
 	do										\
 	{										\
-		assert(ELF);								\
 		fwrite(&(const type[]){ __VA_ARGS__ },					\
 				sizeof(type),						\
 				sizeof((const type[]){ __VA_ARGS__ })/sizeof(type),	\
-				ELF);							\
+				emitter_get_elf());					\
 	} while(0)
 
 #define write_b(...)	write_elf(uint8_t, __VA_ARGS__)

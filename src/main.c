@@ -1,67 +1,60 @@
 #include "ncc.h"
 #include "def_perror.h"
+#include <stdio.h>
 #include <string.h>
 #include <malloc.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 /*-------------------------------------------*/
 static inline void PrintUsage(void);
-static int Compile(const char *in_filename, const char *out_filename, const char *out_asm_filename,
-		const int need_asm, const int need_dump);
+static int Compile(const char *code_path, const char *elf_path, const char *nasm_path, const char *dump_path);
 /*-------------------------------------------*/
 
 int main(int argc, char *argv[])
 {
-	char *in_filename = NULL;
-	char *out_asm_filename = NULL;
-	char *out_filename = NULL;
-	int need_asm = 0;
-	int need_dump = 0;
 	int compile_status = 0;
+	char *code_path = NULL, *elf_path = NULL, *nasm_path = NULL, *dump_path = NULL;
 
 	for (int i = 1; i < argc; i++)
 	{
 		if(!strcmp(argv[i], "-o"))
 		{
-			if(++i < argc && out_filename == NULL)
-				out_filename = argv[i];
+			if(++i < argc)	elf_path = argv[i];
 		}
-		else if(!strcmp(argv[i], "--asm"))
+		else if(!strcmp(argv[i], "--nasm"))
 		{
-			need_asm = 1;
-			if (++i < argc && out_asm_filename == NULL)
-				out_asm_filename = argv[i];
+			if(++i < argc)	nasm_path = argv[i];
 		}
 		else if(!strcmp(argv[i], "--help"))
 		{
 			PrintUsage();
 			goto exit;
 		}
-		else if(!strcmp(argv[i], "--dump"))	need_dump = 1;
-		else if (in_filename == NULL)
-			in_filename = argv[i];
+		else if(!strcmp(argv[i], "--dump"))
+		{
+			if(++i < argc)	dump_path = argv[i];
+		}
+		else if(code_path == NULL)	code_path = argv[i];
+		else
+			fprintf(stderr, "invalid cl args, try --help to get usage\n");
 	}
 	
-	if(in_filename == NULL)
+	if(code_path == NULL)
 	{
-		PrintUsage();
+		fprintf(stderr, "missing filename\n");
 		compile_status = 1;
 		goto exit;
 	}
 
-	if(out_filename == NULL)
-		out_filename = "a.out";			/* default name */
-	if(out_asm_filename == NULL)
-		out_asm_filename = "out.nasm";		/* default name */
+	if(elf_path == NULL)	elf_path = "a.out";
+	if(nasm_path == NULL)	nasm_path = "out.nasm";
 
-	compile_status = Compile(in_filename, out_filename, out_asm_filename, need_asm, need_dump);
+	compile_status = Compile(code_path, elf_path, nasm_path, dump_path);
 
 exit:
-//	if(0)	/* turned off */
-//	{
-//		sleep(1);
-//		system("tiv ./Img/funnyded.jpg"); /* easter egg =) */
-//	}
-
 	return compile_status;
 }
 
@@ -71,87 +64,88 @@ static inline void PrintUsage(void)
 						colorize("ncc ", _BOLD_ _GREEN_) colorize("<file>\n", _BOLD_ _MAGENTA_)
 						colorize("\t[-o <output filename>]\t", _BOLD_ _CYAN_)
 						colorize("Default output filename is 'a.out'\n", _GREEN_)
-						colorize("\t[--asm <asm filename>]\t", _BOLD_ _CYAN_)
+						colorize("\t[--nasm <asm filename>]\t", _BOLD_ _CYAN_)
 						colorize("Will be produced if this flag typed\n", _GREEN_)
 						colorize("\t\t[--help]\t", _BOLD_ _CYAN_)
 						colorize("display this information\n\n", _GREEN_));
 }
 
-#define SYS_MSG_SIZE 100
-static int Compile(const char *in_filename, const char *out_filename, const char *out_asm_filename,
-		const int need_asm, const int need_dump)
+static int Compile(const char *code_path, const char *elf_path, const char *nasm_path, const char *dump_path)
 {
-	assert(in_filename);
-	assert(out_filename);
-	assert(out_asm_filename);
+	assert(code_path);	assert(elf_path);
 
-	FILE *output_asm = NULL;
-	char *code = NULL;
-	toks_t *toks = NULL;
-	node_t *tree = NULL;
-	char sys_msg[SYS_MSG_SIZE] = "";
+	int compile_status = 0;
 
-	snprintf(sys_msg, SYS_MSG_SIZE, "myasm %s -o %s", out_asm_filename, out_filename);
+	int code_fd = open(code_path, O_RDONLY);
+	if(code_fd < 0)	{ perror("open"); return 1; }
+	struct stat code_finfo = {};	fstat(code_fd, &code_finfo);
 
-	output_asm = fopen(out_asm_filename, "w");
-	if (output_asm == NULL)
-	{
-		print_err_msg("output file(s) cannot be open");
-		goto err_exit;
-	}
-
-	code = NULL;
-	if(ReadFileToBuf(in_filename, &code) == 0)
-		goto err_exit;
+	char *code = (char *)mmap(NULL, (size_t)code_finfo.st_size, PROT_READ, MAP_PRIVATE, code_fd, 0);
 	assert(code);
 
-	toks = Tokenize(code);
+	FILE *elf = fopen(elf_path, "wb");
+	if(elf == NULL)	{ perror("fopen"); return 1; }
+
+	FILE *nasm = NULL;
+	if(nasm_path)
+	{
+		nasm = fopen(nasm_path, "w");
+		if(nasm == NULL) { perror("fopen"); return 1; }
+	}
+	else
+	{
+		nasm = tmpfile();
+		if(nasm == NULL) { perror("tmpfile"); return 1; }
+	}
+
+
+	toks_t *toks = Tokenize(code);
 	if(toks == NULL || toks->data == NULL)
 	{
 		print_err_msg("tokenize failed");
 		goto err_exit;
 	}
+	munmap(code, (size_t)code_finfo.st_size);
+	code = NULL;
 
-	tree = Parse(toks, in_filename);
-	if(tree == NULL)
+	node_t *ast = Parse(toks, code_path);
+	if(ast == NULL)
 	{
 		print_err_msg("parse failed");
 		goto err_exit;
 	}
 
-	if(need_dump)	TreeDump(tree);
+	if(dump_path)
+	{
+		FILE *dump = fopen(dump_path, "w");
+
+		if(dump)
+		{
+			TreeDump(ast);
+			fclose(dump);
+		}
+		else	perror("fopen");
+	}
 	
-	if(CompileTree(tree, output_asm))
+	if(CompileTree(ast, elf, nasm))
 	{
 		print_err_msg("backend failed");
 		goto err_exit;
 	}
-	
-	fclose(output_asm);
-	output_asm = NULL;
-	
-//	if (system(sys_msg))
-//		goto err_exit;
 
-	/*---------------------*/
-	free(code);
-	ToksDestroy(toks);
-	TreeDestroy(tree);
-	if (!need_asm)
-		remove(out_asm_filename);
-	return 0;
+	goto normal_exit;
 
 err_exit:
-	free(code);
-	ToksDestroy(toks);
-	TreeDestroy(tree);
-	if(!need_asm)
-		remove(out_filename);
-	if(output_asm)
-		fclose(output_asm);
-	if (output_asm && !need_asm)
-		remove(out_asm_filename);
-	return 1;
+	compile_status = 1;
+	
+normal_exit:
+	compile_status = 0;
+	TreeDestroy(ast);	ast = NULL;
+	ToksDestroy(toks);	toks = NULL;
+
+	fclose(elf);		elf = NULL;
+	fclose(nasm);		nasm = NULL;
+
+	return compile_status;
 }
-#undef SYS_MSG_SIZE
 

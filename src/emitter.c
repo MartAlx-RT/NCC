@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <malloc.h>
 #include <string.h>
-#include <stdarg.h>
 
 #pragma GCC push_options
 #pragma GCC optimize ("-fno-stack-protector")
@@ -27,7 +26,7 @@ static fixups_t FIXUPS = {};
 
 /* common functions */ 
 
-void emitter_init(FILE *nasm, FILE *elf)
+void emitter_init(FILE *elf, FILE *nasm)
 {
 	assert(nasm);	assert(elf);
 	ELF = elf;	NASM = nasm;
@@ -60,9 +59,23 @@ void emitter_deinit(void)
 	NASM = ELF = NULL;
 }
 
+void emitter_free_names(void)
+{
+	for(size_t i = 0; i < FIXUPS.lbls.size; i++)
+		free(FIXUPS.lbls.lbls[i].name);
+
+	for(size_t i = 0; i < FIXUPS.refs.size; i++)
+		free(FIXUPS.refs.refs[i].name);
+}
+
 ssize_t emitter_get_elf_pos(void)
 {
 	return ftell(ELF);
+}
+
+FILE *emitter_get_elf(void)
+{
+	return ELF;
 }
 
 void emitter_fixup_add_ref(const ref_t ref)
@@ -77,21 +90,21 @@ void emitter_fixup_add_ref(const ref_t ref)
 	FIXUPS.refs.refs[FIXUPS.refs.size++] = ref;
 }
 
-char *emitter_make_msg(const char *fmt, ...)
+char *emitter_make_msg(const char *fmt, va_list args)
 {
-	va_list args;
-	va_start(args, fmt);
-	ssize_t size = vsnprintf(NULL, 0, fmt, args);
-	va_end(args);
+	va_list vprintf_args;
 
-	if(size < 0)	return NULL;
+	va_copy(vprintf_args, args);
+	int n = vsnprintf(NULL, 0, fmt, vprintf_args);
+	if(n < 0)	return NULL;
 
-	char *msg = (char *)calloc((size_t)(size+1), sizeof(char));
+	size_t size = (size_t)n;
+
+	char *msg = (char *)calloc(size+1, sizeof(char));
 	assert(msg);
 
-	va_start(args, fmt);
-	vsnprintf(msg, size+1, fmt, args);
-	va_end(args);
+	va_copy(vprintf_args, args);
+	vsnprintf(msg, size+1, fmt, vprintf_args);
 
 	return msg;
 }
@@ -100,7 +113,7 @@ char *emitter_make_msg(const char *fmt, ...)
 // continue varargs fucking
 // continue rewrite backend
 // test reg, reg
-void emitter_fixup_add_lbl(const lbl_t lbl, ...)
+void emitter_fixup_add_lbl(const lbl_t lbl)
 {
 	if(FIXUPS.lbls.size >= FIXUPS.lbls.cap)
 	{
@@ -139,7 +152,7 @@ void emitter_fixup(void)
 			{
 				elf_seek(ref->pos - 6);	write_b(0x0f);
 			}
-			write_b(ref->type);	write_d((uint32_t)(int32_t)distance);
+			write_b(ref->type);	write_d((uint32_t)distance);
 		}
 	}
 
@@ -148,18 +161,21 @@ void emitter_fixup(void)
 
 /* emit instruction functions */
 
-void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const uint32_t disp)
+void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const int32_t disp)
 {
 	write_b(REX_W);
 
 	switch(type)
 	{
-		case MOV_IMM_TO_REG:	write_b((uint8_t)(type + reg));	write_q(op.imm);	break;
+		case MOV_IMM_TO_REG:
+					write_b((uint8_t)(type + reg));
+					write_q((uint64_t)op.imm);
+					break;
 
 		case MOV_REG_TO_MEM:
 		case MOV_MEM_TO_REG:
 					write_b(type, MODRM(mod, reg, op.reg));
-					if(mod == MOD_M_DISP)	write_d(disp);
+					if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 					break;
 
 		case MOV_IMM_TO_MEM:
@@ -167,7 +183,7 @@ void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_
 	}
 }
 
-void emit_push(const push_t type, mod_t mod, const operand_t op, uint32_t disp)
+void emit_push(const push_t type, mod_t mod, const operand_t op, const int32_t disp)
 {
 	switch(type)
 	{
@@ -176,14 +192,14 @@ void emit_push(const push_t type, mod_t mod, const operand_t op, uint32_t disp)
 
 		case PUSH_MEM:
 				write_b(PUSH_MEM, MODRM(mod, 6, op.reg));
-				if(mod == MOD_M_DISP)	write_d(disp);
+				if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 				break;
 
 		default:	fprintf(stderr, "push type out of range\n");
 	}
 }
 
-void emit_pop(const pop_t type, mod_t mod, const operand_t op, uint32_t disp)
+void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t disp)
 {
 	switch(type)
 	{
@@ -191,7 +207,7 @@ void emit_pop(const pop_t type, mod_t mod, const operand_t op, uint32_t disp)
 
 		case POP_MEM:
 				write_b(POP_MEM, MODRM(mod, 0, op.reg));
-				if(mod == MOD_M_DISP)	write_d(disp);
+				if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 				break;
 
 		default:	fprintf(stderr, "pop type out of range\n");
@@ -203,24 +219,43 @@ void emit_abs_branch(const branch_t type, const operand_t op)
 	write_b((uint8_t)type, MODRM(6, 4, op.reg));
 }
 
-void emit_rel_branch(const branch_t type, const char *lbl)
+void emit_rel_branch(const branch_t type, const char *fmt, ...)
 {
-	assert(lbl);
+	assert(fmt);
 
 	write_b(0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
-	emitter_fixup_add_ref((const ref_t){ .pos = emitter_get_elf_pos(), .type = type, .name = lbl });
+
+	ref_t ref = {};
+	ref.pos = emitter_get_elf_pos();
+	ref.type = type;
+
+	va_list args;
+	va_start(args, fmt);
+	ref.name = emitter_make_msg(fmt, args);
+	va_end(args);
+
+	emitter_fixup_add_ref(ref);
 }
 
-void emit_lbl(const char *lbl)
+void emit_lbl(const char *fmt, ...)
 {
-	assert(lbl);
+	assert(fmt);
 
-	emitter_fixup_add_lbl((const lbl_t){ .pos = emitter_get_elf_pos(), .name = lbl });
+	lbl_t lbl = {};
+	lbl.pos = emitter_get_elf_pos();
+
+	va_list args;
+	va_start(args, fmt);
+	lbl.name = emitter_make_msg(fmt, args);
+	va_end(args);
+
+	emitter_fixup_add_lbl(lbl);
 }
 
 void emit_enter(const uint16_t shift)
 {
-	write_b(0xc8);	write_w(shift);
+	write_b(0xc8);
+	write_w(shift);	write_b(0x00);
 }
 
 void emit_leave(void)
@@ -258,6 +293,11 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 			write_b((uint8_t)type, MODRM(MOD_R, dst.reg, src.reg));
 			break;
 
+		case ARIFM_CMP_REG_TO_IMM:
+			write_b(ARIFM_CMP_REG_TO_IMM, MODRM(MOD_R, 7, dst.reg));
+			write_d((uint32_t)src.imm);
+			break;
+
 		/* without unique opcode */
 		case ARIFM_ADD_IMM_TO_REG:
 			write_b(0x83, MODRM(MOD_R, 0, dst.reg), (uint8_t)src.imm);
@@ -280,6 +320,13 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 
 		default:	fprintf(stderr, "arifm type out of range\n");
 	}
+}
+
+void emit_lea(const mod_t mod, const operand_t dst, const operand_t base, const int32_t disp)
+{
+	write_b(REX_W, 0x8d, MODRM(mod, dst.reg, base.reg));
+
+	if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 }
 
 #pragma GCC pop_options
