@@ -130,7 +130,7 @@ static void CreateDigraph(const node_t *tree, FILE *f)
 }
 
 #define DOT_PATH "/tmp/ncc_dot_dot_dump.dot"
-void TreeDump(const node_t *tree)
+void TreeDump(const node_t *tree, char *f_path)
 {	
 	assert(tree);
 
@@ -142,7 +142,7 @@ void TreeDump(const node_t *tree)
 	if(pid < 0)
 		perror("fork");
 	else if(pid == 0)
-		execv("/bin/dot", (char *const[]){ "bin/dot", DOT_PATH, "-Tsvg", "-o", "dump.svg", NULL });
+		execv("/bin/dot", (char *const[]){ "bin/dot", DOT_PATH, "-Tsvg", "-o", f_path, NULL });
 	else
 	{
 		int status = 0;

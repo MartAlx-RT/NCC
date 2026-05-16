@@ -75,18 +75,21 @@ static int Compile(const char *code_path, const char *elf_path, const char *nasm
 	assert(code_path);	assert(elf_path);
 
 	int compile_status = 0;
+	FILE *nasm = NULL, *elf = NULL;
+	char *code = NULL;
+	toks_t *toks = NULL;
+	node_t *ast = NULL;
 
 	int code_fd = open(code_path, O_RDONLY);
 	if(code_fd < 0)	{ perror("open"); return 1; }
 	struct stat code_finfo = {};	fstat(code_fd, &code_finfo);
 
-	char *code = (char *)mmap(NULL, (size_t)code_finfo.st_size, PROT_READ, MAP_PRIVATE, code_fd, 0);
+	code = (char *)mmap(NULL, (size_t)code_finfo.st_size, PROT_READ, MAP_PRIVATE, code_fd, 0);
 	assert(code);
 
-	FILE *elf = fopen(elf_path, "wb");
+	elf = fopen(elf_path, "wb");
 	if(elf == NULL)	{ perror("fopen"); return 1; }
 
-	FILE *nasm = NULL;
 	if(nasm_path)
 	{
 		nasm = fopen(nasm_path, "w");
@@ -99,7 +102,7 @@ static int Compile(const char *code_path, const char *elf_path, const char *nasm
 	}
 
 
-	toks_t *toks = Tokenize(code);
+	toks = Tokenize(code);
 	if(toks == NULL || toks->data == NULL)
 	{
 		print_err_msg("tokenize failed");
@@ -108,7 +111,7 @@ static int Compile(const char *code_path, const char *elf_path, const char *nasm
 	munmap(code, (size_t)code_finfo.st_size);
 	code = NULL;
 
-	node_t *ast = Parse(toks, code_path);
+	ast = Parse(toks, code_path);
 	if(ast == NULL)
 	{
 		print_err_msg("parse failed");
@@ -118,10 +121,9 @@ static int Compile(const char *code_path, const char *elf_path, const char *nasm
 	if(dump_path)
 	{
 		FILE *dump = fopen(dump_path, "w");
-
 		if(dump)
 		{
-			TreeDump(ast);
+			TreeDump(ast, (char *)dump_path);
 			fclose(dump);
 		}
 		else	perror("fopen");
@@ -139,7 +141,6 @@ err_exit:
 	compile_status = 1;
 	
 normal_exit:
-	compile_status = 0;
 	TreeDestroy(ast);	ast = NULL;
 	ToksDestroy(toks);	toks = NULL;
 

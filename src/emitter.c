@@ -127,6 +127,8 @@ void emitter_fixup_add_lbl(const lbl_t lbl)
 
 void emitter_fixup(void)
 {
+	const ssize_t current_pos = emitter_get_elf_pos();
+
 	for(size_t i = 0; i < FIXUPS.refs.size; i++)
 	{
 		lbl_t *lbl = NULL;
@@ -156,7 +158,7 @@ void emitter_fixup(void)
 		}
 	}
 
-	elf_seek_end();
+	fseek(emitter_get_elf(), current_pos, SEEK_SET);
 }
 
 /* emit instruction functions */

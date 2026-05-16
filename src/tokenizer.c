@@ -76,21 +76,23 @@ static char ReadChar(const char **s)
 
 		switch(**s)
 		{
-			case '0':	c = '\0'; break;
-			case 'a':	c = '\a'; break;
-			case 'b':	c = '\b'; break;
-			case 't':	c = '\t'; break;
-			case 'n':	c = '\n'; break;
-			case 'v':	c = '\v'; break;
-			case 'f':	c = '\f'; break;
-			case 'r':	c = '\r'; break;
+			case '0':	c = '\0';	break;
+			case 'a':	c = '\a';	break;
+			case 'b':	c = '\b';	break;
+			case 't':	c = '\t';	break;
+			case 'n':	c = '\n';	break;
+			case 'v':	c = '\v';	break;
+			case 'f':	c = '\f';	break;
+			case 'r':	c = '\r';	break;
 
-			case '\'':	c = '\''; break;
-			case '\\':	c = '\\'; break;
-			case '\"':	c = '\"'; break;
+			case '\'':	c = '\'';	break;
+			case '\\':	c = '\\';	break;
+			case '\"':	c = '\"';	break;
+
+			case '\n':	(*s)++;	return ReadChar(s);
 
 			default:
-					print_err_msg("invalid \\-code");
+					print_err_msg("invalid \\-seq");
 					return 0;
 		}
 	}

@@ -3,11 +3,19 @@
 #include "def_grammar.h"
 #include "def_emitters.h"
 #include "emitter.h"
+#include <fcntl.h>
 #include <malloc.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <x86intrin.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define ELF_LOAD_VA	0x28000
 
 typedef enum global_type_t
 {
@@ -19,6 +27,7 @@ typedef struct global_t
 {
 	global_type_t type;
 	node_val_t val;
+	ssize_t pos;
 } global_t;
 
 typedef struct globals_t
@@ -122,7 +131,7 @@ int CompileTree(const node_t *ast, FILE *elf, FILE *nasm)
 	}
 
 //	write_asm("\n\nsection\t.rodata\n");
-//	GenGlobals();
+	GenGlobals();
 //	write_asm("\nsection\t.text\n");
 
 	emitter_fixup();
@@ -148,6 +157,8 @@ static size_t NewGlobal(const global_t global)
 
 static void GenGlobals(void)
 {
+	fseek(emitter_get_elf(), (emitter_get_elf_pos()+8)/8 * 8, SEEK_SET);
+
 	for(size_t i = 0; i < GLOBALS.size; i++)
 	{
 		if(GLOBALS.globals[i].type == GLOB_STR)
@@ -155,10 +166,14 @@ static void GenGlobals(void)
 			const char *str = GLOBALS.globals[i].val.name;
 
 //			write_asm("_glob%lu:\n\tdq\t", i);
-			LBL("_glob%lu", i);
+			const ssize_t current_pos = emitter_get_elf_pos();
+
+			fseek(emitter_get_elf(), GLOBALS.globals[i].pos, SEEK_SET);
+			MOV_RI(RAX, ELF_LOAD_VA + current_pos);
+			fseek(emitter_get_elf(), current_pos, SEEK_SET);
 
 //			while(*str)	write_asm("%ld, ", (long)*str++);
-			while(*str)	write_q((uint64_t)*str++);
+			while(*str)	write_q((uint8_t)*str++);
 
 //			write_asm("0\n");
 			write_q(0);
@@ -238,6 +253,17 @@ static void GenStr(const node_t *ast)
 	assert(ASM_OUT);
 	assert(ast->data.type == TP_LITERAL);
 
+	global_t global =
+	{
+		.pos = emitter_get_elf_pos(),
+		.type = GLOB_STR,
+		.val = ast->data.val
+	};
+	NewGlobal(global);
+
+	MOV_RI(RAX, 0);		// not true mov, just a filler
+	SHR_RI(RAX, 3);
+	PUSH_R(RAX);
 //	write_asm
 //		(
 //		 "\tmov\trax, _glob%lu\t; <str>\n"
@@ -245,8 +271,6 @@ static void GenStr(const node_t *ast)
 //		 "\tpush\trax\n",
 //		 NewGlobal((const global_t){ .type = GLOB_STR, .val = ast->data.val })
 //		);
-
-	fprintf(stderr, "string has not implemented yet\n");
 }
 
 static void GenOpSeq(const node_t *ast)
@@ -405,13 +429,44 @@ static void GenAsm(const node_t *ast)
 	if(!(ast->child && ast->child->node))
 		err_exit_msg("invalid node");
 
-//	write_asm
-//		(
-//		 "; <asm inline>:\n"
-//		 "%s\n",
-//		 ast->child->node->data.val.name
-//		);
-	fprintf(stderr, "asm has not implemented yet\n");
+	const char *code = ast->child->node->data.val.name;
+
+	char nasm_path[50] = "";
+	snprintf(nasm_path, 50, "/tmp/ncc%llu.nasm", _rdtsc());
+
+	/* write nasm to file */
+	FILE *nasm = fopen(nasm_path, "w");	assert(nasm);
+	fputs("[bits 64]\n", nasm);	fwrite(code, sizeof(char), strlen(code), nasm);
+	fclose(nasm);	nasm = NULL;
+
+	/* run nasm */
+	pid_t pid = fork();
+
+	if(pid < 0)
+		perror("fork");
+	else if(pid == 0)
+		execv("/bin/nasm", (char *const[]){ "/bin/nasm", "-f", "bin", nasm_path, NULL });
+	else
+	{
+		int status = 0;
+		waitpid(pid, &status, 0);
+
+		if(WEXITSTATUS(status))	err_exit_msg("nasm failed");
+	}
+
+	/* write elf */
+	char *dot = strchr(nasm_path, '.');	assert(dot);
+	*dot = '\0';
+
+	int elf_fd = open(nasm_path, O_RDONLY);	assert(elf_fd > 0);
+	struct stat elf_finfo = {};		fstat(elf_fd, &elf_finfo);
+	char *bin = (char *)mmap(NULL, (size_t)elf_finfo.st_size, PROT_READ, MAP_PRIVATE, elf_fd, 0);
+	assert(bin);
+
+	fwrite(bin, 1, (size_t)elf_finfo.st_size, emitter_get_elf());
+
+	munmap(bin, (size_t)elf_finfo.st_size);	bin = NULL;
+	close(elf_fd);	elf_fd = 0;
 }
 
 static void GenOr(const node_t *ast)
