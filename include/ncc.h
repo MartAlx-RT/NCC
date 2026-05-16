@@ -229,6 +229,6 @@ node_t *Parse(toks_t *toks, const char *filename);
 void ToksDestroy(toks_t *toks);
 
 /* back-end */
-int CompileTree(const node_t *tree, FILE *asm_out);
+int CompileTree(const node_t *ast, FILE *asm_out, FILE *elf);
 
 #endif

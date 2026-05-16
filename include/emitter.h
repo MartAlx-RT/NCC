@@ -48,8 +48,8 @@ typedef enum pop_t
 
 typedef enum branch_t
 {
-	B_JMP_REL32	= 0xe9,
-	B_CALL_REL32	= 0xe8,
+	B_JMP_REL	= 0xe9,
+	B_CALL_REL	= 0xe8,
 
 	B_JE		= 0x84,
 	B_JNE		= 0x85,
@@ -118,6 +118,7 @@ typedef struct fixups_t
 void emitter_init(FILE *nasm, FILE *elf);
 void emitter_deinit(void);
 ssize_t emitter_get_elf_pos(void);
+char *emitter_make_msg(const char *fmt, ...);
 void emitter_fixup_add_ref(const ref_t ref);
 void emitter_fixup_add_lbl(const lbl_t lbl);
 void emitter_fixup(void);

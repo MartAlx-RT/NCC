@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdarg.h>
 
 #pragma GCC push_options
 #pragma GCC optimize ("-fno-stack-protector")
@@ -76,7 +77,30 @@ void emitter_fixup_add_ref(const ref_t ref)
 	FIXUPS.refs.refs[FIXUPS.refs.size++] = ref;
 }
 
-void emitter_fixup_add_lbl(const lbl_t lbl)
+char *emitter_make_msg(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	ssize_t size = vsnprintf(NULL, 0, fmt, args);
+	va_end(args);
+
+	if(size < 0)	return NULL;
+
+	char *msg = (char *)calloc((size_t)(size+1), sizeof(char));
+	assert(msg);
+
+	va_start(args, fmt);
+	vsnprintf(msg, size+1, fmt, args);
+	va_end(args);
+
+	return msg;
+}
+
+// TODO
+// continue varargs fucking
+// continue rewrite backend
+// test reg, reg
+void emitter_fixup_add_lbl(const lbl_t lbl, ...)
 {
 	if(FIXUPS.lbls.size >= FIXUPS.lbls.cap)
 	{
@@ -109,7 +133,7 @@ void emitter_fixup(void)
 			if(abs_distance >= INT32_MAX)
 				fprintf(stderr, "`%s`: distance is too large\n", lbl->name);
 
-			if(ref->type == B_CALL_REL32 || ref->type == B_JMP_REL32)
+			if(ref->type == B_CALL_REL || ref->type == B_JMP_REL)
 				elf_seek(ref->pos - 5);
 			else
 			{

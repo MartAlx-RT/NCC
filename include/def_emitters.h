@@ -23,6 +23,8 @@
 #define CALL_L(l)		emit_rel_branch(B_CALL_REL, l)
 #define LBL(l)			emit_lbl(l)
 
+#define MSG(s, ...)		emitter_make_msg(s, ##__VA_ARGS__)
+
 #define JE(l)			emit_rel_branch(B_JE, l)
 #define JNE(l)			emit_rel_branch(B_JNE, l)
 #define JG(l)			emit_rel_branch(B_JG, l)
