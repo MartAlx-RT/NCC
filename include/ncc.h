@@ -216,7 +216,7 @@ size_t ReadFileToBuf(const char *file_path, char **buf);
 
 /* dump */
 void PrintToks(node_data_t data[], FILE *dump_file, size_t limit);
-void TreeDump(const node_t *tree, char *f_path);
+void TreeDump(const node_t *tree);
 
 /* tree functions */
 void AddChild(node_t *node, node_t *new_child);

@@ -10,13 +10,14 @@
 
 /*-------------------------------------------*/
 static inline void PrintUsage(void);
-static int Compile(const char *code_path, const char *elf_path, const char *nasm_path, const char *dump_path);
+static int Compile(const char *code_path, const char *elf_path, const char *nasm_path, int need_dump);
 /*-------------------------------------------*/
 
 int main(int argc, char *argv[])
 {
 	int compile_status = 0;
-	char *code_path = NULL, *elf_path = NULL, *nasm_path = NULL, *dump_path = NULL;
+	char *code_path = NULL, *elf_path = NULL, *nasm_path = NULL;
+	int need_dump = 0;
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -35,7 +36,7 @@ int main(int argc, char *argv[])
 		}
 		else if(!strcmp(argv[i], "--dump"))
 		{
-			if(++i < argc)	dump_path = argv[i];
+			need_dump = 1;
 		}
 		else if(code_path == NULL)	code_path = argv[i];
 		else
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
 	if(elf_path == NULL)	elf_path = "a.out";
 	if(nasm_path == NULL)	nasm_path = "out.nasm";
 
-	compile_status = Compile(code_path, elf_path, nasm_path, dump_path);
+	compile_status = Compile(code_path, elf_path, nasm_path, need_dump);
 
 exit:
 	return compile_status;
@@ -70,7 +71,7 @@ static inline void PrintUsage(void)
 						colorize("display this information\n\n", _GREEN_));
 }
 
-static int Compile(const char *code_path, const char *elf_path, const char *nasm_path, const char *dump_path)
+static int Compile(const char *code_path, const char *elf_path, const char *nasm_path, int need_dump)
 {
 	assert(code_path);	assert(elf_path);
 
@@ -118,16 +119,7 @@ static int Compile(const char *code_path, const char *elf_path, const char *nasm
 		goto err_exit;
 	}
 
-	if(dump_path)
-	{
-		FILE *dump = fopen(dump_path, "w");
-		if(dump)
-		{
-			TreeDump(ast, (char *)dump_path);
-			fclose(dump);
-		}
-		else	perror("fopen");
-	}
+	if(need_dump)	TreeDump(ast);
 	
 	if(CompileTree(ast, elf, nasm))
 	{

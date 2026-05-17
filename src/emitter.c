@@ -1,5 +1,6 @@
 #include "emitter.h"
 #include "def_emitters.h"
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -8,6 +9,7 @@
 #include <fcntl.h>
 #include <malloc.h>
 #include <string.h>
+#include <elf.h>
 
 #pragma GCC push_options
 #pragma GCC optimize ("-fno-stack-protector")
@@ -28,24 +30,62 @@ static fixups_t FIXUPS = {};
 
 void emitter_init(FILE *elf, FILE *nasm)
 {
-	assert(nasm);	assert(elf);
+	assert(elf);	assert(nasm);
 	ELF = elf;	NASM = nasm;
 
-	int templ_fd = open("/home/alex/Cprojects/NCC/bin/template", O_RDONLY);
-	assert(templ_fd > 0);
+	const Elf64_Ehdr elf_header =
+	{
+		.e_ident =
+		{
+			[EI_MAG0] = ELFMAG0,
+			[EI_MAG1] = ELFMAG1,
+			[EI_MAG2] = ELFMAG2,
+			[EI_MAG3] = ELFMAG3,
 
-	struct stat templ_finfo = {};	fstat(templ_fd, &templ_finfo);
-	char *templ = (char *)mmap(NULL, (size_t)templ_finfo.st_size, PROT_READ, MAP_PRIVATE, templ_fd, 0);
-	assert(templ);
+			[EI_CLASS] = ELFCLASS64,
+			[EI_DATA] = ELFDATA2LSB,
+			[EI_VERSION] = EV_CURRENT,
+			[EI_OSABI] = ELFOSABI_SYSV,
+			[EI_ABIVERSION] = 0,
+			[EI_PAD] = 0
+		},
 
-	size_t chck_fwrite = fwrite(templ, sizeof(char), (size_t)templ_finfo.st_size, ELF);
+		.e_flags = 0,
+		.e_type = ET_EXEC,
+		.e_machine = EM_X86_64,
+		.e_version = EV_CURRENT,
 
-	munmap(templ, (size_t)templ_finfo.st_size);	close(templ_fd);
-	templ = 0;	templ_fd = 0;
+		.e_entry = ELF_ENTRY_VA,
+		.e_phoff = sizeof(Elf64_Ehdr),		/* prog hdr off */
+		.e_shoff = 0,				/* section hdr tbl off */
 
-	if(chck_fwrite != (size_t)templ_finfo.st_size)	{ perror("fwrite"); return; }
+		.e_ehsize = sizeof(Elf64_Ehdr),
+		.e_phentsize = sizeof(Elf64_Phdr),
+		.e_shentsize = sizeof(Elf64_Shdr),
 
-	fseek(ELF, 0x138, SEEK_SET);
+		.e_phnum = 1,		/* number of entries */
+		.e_shnum = 0,		/* entries in sections hdrs tbl */
+		.e_shstrndx = SHN_UNDEF	/* section hdr tbl idx of the entry associated with the section name str tbl */
+	};
+
+	const Elf64_Phdr program_header =
+	{
+		.p_type = PT_LOAD,
+		.p_offset = ELF_START_OFF,	/* file pos off */
+		.p_vaddr = ELF_ENTRY_VA,
+		.p_paddr = 0xDED,
+
+		.p_filesz = 0,			/* needed fixup */
+		.p_memsz = 0,			/* needed fixup */
+
+		.p_flags = PF_R | PF_X,
+		.p_align = PAGE_SIZE
+	};
+
+	fwrite(&elf_header, sizeof(elf_header), 1, ELF);
+	fwrite(&program_header, sizeof(program_header), 1, ELF);
+
+	fseek(emitter_get_elf(), ELF_START_OFF, SEEK_SET);
 }
 
 void emitter_deinit(void)
@@ -55,6 +95,14 @@ void emitter_deinit(void)
 
 	FIXUPS.refs.cap = FIXUPS.refs.size = 0;
 	FIXUPS.lbls.cap = FIXUPS.lbls.size = 0;
+
+	const size_t elf_size = (size_t)emitter_get_elf_pos();
+	fseek(emitter_get_elf(),
+		sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) - 3*sizeof(uint64_t),
+		SEEK_SET);
+
+	write_q(elf_size, elf_size);
+	fseek(emitter_get_elf(), 0, SEEK_END);
 
 	NASM = ELF = NULL;
 }
@@ -109,10 +157,6 @@ char *emitter_make_msg(const char *fmt, va_list args)
 	return msg;
 }
 
-// TODO
-// continue varargs fucking
-// continue rewrite backend
-// test reg, reg
 void emitter_fixup_add_lbl(const lbl_t lbl)
 {
 	if(FIXUPS.lbls.size >= FIXUPS.lbls.cap)

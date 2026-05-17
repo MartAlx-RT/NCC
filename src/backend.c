@@ -5,6 +5,7 @@
 #include "emitter.h"
 #include <fcntl.h>
 #include <malloc.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,8 +15,6 @@
 #include <x86intrin.h>
 #include <unistd.h>
 #include <sys/wait.h>
-
-#define ELF_LOAD_VA	0x28000
 
 typedef enum global_type_t
 {
@@ -157,7 +156,7 @@ static size_t NewGlobal(const global_t global)
 
 static void GenGlobals(void)
 {
-	fseek(emitter_get_elf(), (emitter_get_elf_pos()+8)/8 * 8, SEEK_SET);
+	fseek(emitter_get_elf(), (emitter_get_elf_pos()+7)/8 * 8, SEEK_SET);
 
 	for(size_t i = 0; i < GLOBALS.size; i++)
 	{
@@ -169,7 +168,7 @@ static void GenGlobals(void)
 			const ssize_t current_pos = emitter_get_elf_pos();
 
 			fseek(emitter_get_elf(), GLOBALS.globals[i].pos, SEEK_SET);
-			MOV_RI(RAX, ELF_LOAD_VA + current_pos);
+			MOV_RI(RAX, (ssize_t)(ELF_ENTRY_VA - ELF_START_OFF) + current_pos);
 			fseek(emitter_get_elf(), current_pos, SEEK_SET);
 
 //			while(*str)	write_asm("%ld, ", (long)*str++);

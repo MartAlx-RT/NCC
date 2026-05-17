@@ -1,9 +1,16 @@
+#ifndef EMITTER_H
+#define EMITTER_H
+
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <sys/user.h>
+
+#define ELF_ENTRY_VA	0x400000
+#define ELF_START_OFF	PAGE_SIZE
 
 /* enums */
 
@@ -140,4 +147,6 @@ void emit_push(const push_t type, mod_t mod, const operand_t op, const int32_t d
 void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t disp);
 void emit_arifm(const arifm_t type, operand_t dst, operand_t src);
 void emit_lea(const mod_t mod, const operand_t dst, const operand_t base, const int32_t disp);
+
+#endif /* EMITTER_H */
 
