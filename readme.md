@@ -5,11 +5,17 @@
 ## Репозиторий
 
 ### Ветки
-Репозиторий состоит из 2 веток: `master` и `nasm_backend`.
-На ветке `master` эмулятор, на ветке `nasm_backend` — компилятор
-в ассемблер `nasm`.
+Репозиторий состоит из 4 веток: `master`, `nasm`,
+`elf`, `elf-nasm`.
+
+-   `master` — эмулятор
+-   `nasm` — компилятор в ассемблер **nasm**
+-   `elf` — компилятор в исполняемый **elf**
+-   `elf-nasm` — то же, что и `elf`, но с дампом в **nasm** (*бетта-версия*)
 
 ### Структура проекта
+
+Ветка `nasm`
 .\
 ├── `CMakeLists.txt`\
 ├── `include`\
@@ -27,6 +33,27 @@
     ├── `main.c`          (cli)\
     ├── `parser.c`        (парсер)\
     └── `tokenizer.c`     (токенизатор)
+
+Ветка `elf`
+.\
+├── `CMakeLists.txt`
+├── `include`
+│   ├── `def_emitters.h`
+│   ├── `def_grammar.h`
+│   ├── `def_perror.h`
+│   ├── `emitter.h`
+│   ├── `ncc.h`
+│   └── `undef_macros.h`
+└── `src`
+    ├── `ast.c`
+    ├── `ast_dump.c`
+    ├── `backend.c`
+    ├── `emitter.c`
+    ├── `grammar.txt`
+    ├── `input.c`
+    ├── `main.c`
+    ├── `parser.c`
+    └── `tokenizer.c`
 
 ## Синтаксис
 ```
