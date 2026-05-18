@@ -5,15 +5,9 @@
 
 #include <stdio.h>
 #include <assert.h>
-// #include <malloc.h>
-// #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/types.h>
-// #include <string.h>
-// #include <sys/stat.h>
-// #include <sys/wait.h>
-// #include <unistd.h>
 
 typedef enum node_type_t
 {

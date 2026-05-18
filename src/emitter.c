@@ -16,12 +16,6 @@
 
 #define MODRM(mod, r, rm)	((uint8_t)((mod<<6)|(r<<3)|(rm)))
 
-// TODO
-// make code pretty
-// add shl, shr
-// add other needed emits
-//
-
 static FILE *NASM = NULL;
 static FILE *ELF = NULL;
 static fixups_t FIXUPS = {};
@@ -184,7 +178,11 @@ void emitter_fixup(void)
 				lbl = &FIXUPS.lbls.lbls[l];
 		}
 
-		if(lbl == NULL)	fprintf(stderr, "unknown label: `%s`\n", ref->name);
+		if(lbl == NULL)
+		{
+			fprintf(stderr, "unknown label: `%s`\n", ref->name);
+			// TODO: warning -> error
+		}
 		else
 		{
 			ssize_t distance = lbl->pos - ref->pos;
