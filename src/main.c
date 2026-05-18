@@ -54,8 +54,10 @@ int main(int argc, char *argv[])
 	if(nasm_path == NULL)	nasm_path = "out.nasm";
 
 	compile_status = Compile(code_path, elf_path, nasm_path, need_dump);
-
 exit:
+	if(compile_status)	remove(elf_path);
+	else			chmod(elf_path, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
+
 	return compile_status;
 }
 
