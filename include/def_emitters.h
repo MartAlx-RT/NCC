@@ -1,5 +1,3 @@
-#define write_asm(fmt, ...)	fprintf(ASM_OUT, fmt, ##__VA_ARGS__)
-
 #define MOV_RR(dst, src)	emit_mov(MOV_REG_TO_MEM, MOD_R, src, (const operand_t){ .reg = dst }, 0)
 #define MOV_RM(dst, src, disp)	emit_mov(MOV_MEM_TO_REG, MOD_M_DISP, dst, (const operand_t){ .reg = src }, disp)
 #define MOV_MR(dst, src, disp)	emit_mov(MOV_REG_TO_MEM, MOD_M_DISP, src, (const operand_t){ .reg = dst }, disp)
@@ -47,7 +45,7 @@
 #define REX_W	0x48
 
 #define write_nasm(code, ...)	\
-	do { assert(NASM); fprintf(NASM, code, ##__VA_ARGS__); } while(0)
+	do { fprintf(emitter_get_nasm(), code, ##__VA_ARGS__); } while(0)
 
 #define write_elf(type, ...)								\
 	do										\

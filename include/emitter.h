@@ -129,6 +129,7 @@ void emitter_deinit(void);
 void emitter_free_names(void);
 ssize_t emitter_get_elf_pos(void);
 FILE *emitter_get_elf(void);
+FILE *emitter_get_nasm(void);
 void emitter_fixup_add_ref(const ref_t ref);
 void emitter_fixup(void);
 char *emitter_make_msg(const char *fmt, va_list args);

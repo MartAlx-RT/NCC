@@ -16,11 +16,20 @@
 
 #define MODRM(mod, r, rm)	((uint8_t)((mod<<6)|(r<<3)|(rm)))
 
-// TODO
-// make code pretty
-// add shl, shr
-// add other needed emits
-//
+#define DEF_REG(name)	[name] = #name
+static const char *REG_NAMES[] =
+{
+	DEF_REG(RAX),
+	DEF_REG(RCX),
+	DEF_REG(RDX),
+	DEF_REG(RBX),
+	DEF_REG(RSP),
+	DEF_REG(RBP),
+	DEF_REG(RSI),
+	DEF_REG(RDI)
+};
+#undef DEF_REG
+
 
 static FILE *NASM = NULL;
 static FILE *ELF = NULL;
@@ -126,6 +135,11 @@ FILE *emitter_get_elf(void)
 	return ELF;
 }
 
+FILE *emitter_get_nasm(void)
+{
+	return NASM;
+}
+
 void emitter_fixup_add_ref(const ref_t ref)
 {
 	if(FIXUPS.refs.size >= FIXUPS.refs.cap)
@@ -209,8 +223,23 @@ void emitter_fixup(void)
 
 void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_t op, const int32_t disp)
 {
-	write_b(REX_W);
+	switch(type)
+	{
+		case MOV_IMM_TO_REG:
+					write_nasm("\tmov\t%s, %ld\n", REG_NAMES[reg], op.imm);
+					break;
+		case MOV_REG_TO_MEM:
+					write_nasm("\tmov\tqword [%s], %s\n",  REG_NAMES[reg], REG_NAMES[op.reg]);
+					break;
+		case MOV_MEM_TO_REG:
+					write_nasm("\tmov\t%s, qword [%s]\n", REG_NAMES[reg], REG_NAMES[op.reg]);
+					break;
 
+		case MOV_IMM_TO_MEM:
+		default:		fprintf(stderr, "mov type out of range\n");
+	}
+
+	write_b(REX_W);
 	switch(type)
 	{
 		case MOV_IMM_TO_REG:
@@ -233,13 +262,19 @@ void emit_push(const push_t type, mod_t mod, const operand_t op, const int32_t d
 {
 	switch(type)
 	{
-		case PUSH_REG:	write_b((uint8_t)(PUSH_REG + op.reg));			break;
-		case PUSH_IMM:	write_b(PUSH_IMM);	write_d((uint32_t)op.imm);	break;
-
+		case PUSH_REG:
+			write_nasm("\tpush\t%s\n", REG_NAMES[op.reg]);
+			write_b((uint8_t)(PUSH_REG + op.reg));
+			break;
+		case PUSH_IMM:
+			write_nasm("\tpush\t%ld\n", op.imm);
+			write_b(PUSH_IMM);	write_d((uint32_t)op.imm);
+			break;
 		case PUSH_MEM:
-				write_b(PUSH_MEM, MODRM(mod, 6, op.reg));
-				if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
-				break;
+			write_nasm("\tpush\tqword [%s%+d]\n", REG_NAMES[op.reg], disp);
+			write_b(PUSH_MEM, MODRM(mod, 6, op.reg));
+			if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
+			break;
 
 		default:	fprintf(stderr, "push type out of range\n");
 	}
@@ -249,12 +284,16 @@ void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t dis
 {
 	switch(type)
 	{
-		case POP_REG:	write_b((uint8_t)(POP_REG + op.reg));	break;
+		case POP_REG:
+			write_nasm("\tpop\t%s\n", REG_NAMES[op.reg]);
+			write_b((uint8_t)(POP_REG + op.reg));
+			break;
 
 		case POP_MEM:
-				write_b(POP_MEM, MODRM(mod, 0, op.reg));
-				if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
-				break;
+			write_nasm("\tpop\tqword [%s%+d]\n", REG_NAMES[op.reg], disp);
+			write_b(POP_MEM, MODRM(mod, 0, op.reg));
+			if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
+			break;
 
 		default:	fprintf(stderr, "pop type out of range\n");
 	}
@@ -262,6 +301,9 @@ void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t dis
 
 void emit_abs_branch(const branch_t type, const operand_t op)
 {
+	if(type == B_JMP_ABS)	write_nasm("\tjmp\t%s\n", REG_NAMES[op.reg]);
+	else			write_nasm("\tcall\t%s\n", REG_NAMES[op.reg]);
+
 	write_b((uint8_t)type, MODRM(6, 4, op.reg));
 }
 
@@ -280,6 +322,22 @@ void emit_rel_branch(const branch_t type, const char *fmt, ...)
 	ref.name = emitter_make_msg(fmt, args);
 	va_end(args);
 
+	const char *nasm_fmt = NULL;
+	switch(type)
+	{
+		case B_JMP_REL:		nasm_fmt = "\tjmp\t%s\n";	break;
+		case B_CALL_REL:	nasm_fmt = "\tcall\t%s\n";	break;
+		case B_JE:		nasm_fmt = "\tje\t%s\n";	break;
+		case B_JNE:		nasm_fmt = "\tjne\t%s\n";	break;
+		case B_JG:		nasm_fmt = "\tjg\t%s\n";	break;
+		case B_JL:		nasm_fmt = "\tjl\t%s\n";	break;
+
+		case B_JMP_ABS:
+		default:
+					fprintf(stderr, "jmp type out of range\n");
+	}
+	write_nasm(nasm_fmt, ref.name);
+
 	emitter_fixup_add_ref(ref);
 }
 
@@ -295,27 +353,33 @@ void emit_lbl(const char *fmt, ...)
 	lbl.name = emitter_make_msg(fmt, args);
 	va_end(args);
 
+	write_nasm("%s:\n", lbl.name);
+
 	emitter_fixup_add_lbl(lbl);
 }
 
 void emit_enter(const uint16_t shift)
 {
+	write_nasm("\tenter\t%d, 0\n", shift);
 	write_b(0xc8);
 	write_w(shift);	write_b(0x00);
 }
 
 void emit_leave(void)
 {
+	write_nasm("\tleave\n");
 	write_b(0xc9);
 }
 
 void emit_ret(void)
 {
+	write_nasm("\tret\n");
 	write_b(0xc3);
 }
 
 void emit_syscall(void)
 {
+	write_nasm("\tsyscall\n");
 	write_b(0x0f, 0x05);
 }
 
@@ -328,9 +392,43 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 	// CMP_REG_TO_REG	= 0x3b
 	// SHL_IMM_TO_REG	= 0xc1
 	// SHR_IMM_TO_REG	= 0xc1
+	switch(type)
+	{
+		case ARIFM_CMP_REG_TO_REG:
+			write_nasm("\tcmp\t%s, %s\n", REG_NAMES[dst.reg], REG_NAMES[src.reg]);
+			break;
+		case ARIFM_SUB_REG_TO_REG:
+			write_nasm("\tsub\t%s, %s\n", REG_NAMES[dst.reg], REG_NAMES[src.reg]);
+			break;
+		case ARIFM_ADD_REG_TO_REG:
+			write_nasm("\tadd\t%s, %s\n", REG_NAMES[dst.reg], REG_NAMES[src.reg]);
+			break;
+		case ARIFM_CMP_REG_TO_IMM:
+			write_nasm("\tcmp\t%s, %ld\n", REG_NAMES[dst.reg], src.imm);
+			break;
+		case ARIFM_ADD_IMM_TO_REG:
+			write_nasm("\tadd\t%s, %ld\n", REG_NAMES[dst.reg], src.imm);
+			break;
+		case ARIFM_SUB_IMM_TO_REG:
+			write_nasm("\tsub\t%s, %ld\n", REG_NAMES[dst.reg], src.imm);
+			break;
+		case ARIFM_SHL_IMM_TO_REG:
+			write_nasm("\tshl\t%s, %ld\n", REG_NAMES[dst.reg], src.imm);
+			break;
+		case ARIFM_SHR_IMM_TO_REG:
+			write_nasm("\tshr\t%s, %ld\n", REG_NAMES[dst.reg], src.imm);
+			break;
+		case ARIFM_IMUL_REG_TO_REG:
+			write_nasm("\timul\t%s, %ld\n", REG_NAMES[dst.reg], src.imm);
+			break;
+		case ARIFM_IDIV_REG:
+			write_nasm("\tdiv\t%s\n", REG_NAMES[src.reg]);
+			break;
+
+		default:	fprintf(stderr, "arifm type out of range\n");
+	}
 
 	write_b(REX_W);
-
 	switch(type)
 	{
 		case ARIFM_ADD_REG_TO_REG:
@@ -370,6 +468,8 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 
 void emit_lea(const mod_t mod, const operand_t dst, const operand_t base, const int32_t disp)
 {
+	write_nasm("\tlea\t%s, [%s%+d]\n", REG_NAMES[dst.reg], REG_NAMES[base.reg], disp);
+
 	write_b(REX_W, 0x8d, MODRM(mod, dst.reg, base.reg));
 
 	if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
