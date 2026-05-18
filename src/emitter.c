@@ -31,20 +31,20 @@ void emitter_init(FILE *elf, FILE *nasm)
 	{
 		.e_ident =
 		{
-			[EI_MAG0] = ELFMAG0,
+			[EI_MAG0] = ELFMAG0,		/* elf magic nums */
 			[EI_MAG1] = ELFMAG1,
 			[EI_MAG2] = ELFMAG2,
 			[EI_MAG3] = ELFMAG3,
 
-			[EI_CLASS] = ELFCLASS64,
-			[EI_DATA] = ELFDATA2LSB,
-			[EI_VERSION] = EV_CURRENT,
-			[EI_OSABI] = ELFOSABI_SYSV,
+			[EI_CLASS] = ELFCLASS64,	/* bits */
+			[EI_DATA] = ELFDATA2LSB,	/* endian */
+			[EI_VERSION] = EV_CURRENT,	/* crnt version */
+			[EI_OSABI] = ELFOSABI_SYSV,	/* OS ABI */
 			[EI_ABIVERSION] = 0,
 			[EI_PAD] = 0
 		},
 
-		.e_flags = 0,
+		.e_flags = 0,				/* rofl flags */
 		.e_type = ET_EXEC,
 		.e_machine = EM_X86_64,
 		.e_version = EV_CURRENT,
@@ -53,27 +53,27 @@ void emitter_init(FILE *elf, FILE *nasm)
 		.e_phoff = sizeof(Elf64_Ehdr),		/* prog hdr off */
 		.e_shoff = 0,				/* section hdr tbl off */
 
-		.e_ehsize = sizeof(Elf64_Ehdr),
-		.e_phentsize = sizeof(Elf64_Phdr),
+		.e_ehsize = sizeof(Elf64_Ehdr),		/* elf hdr size */
+		.e_phentsize = sizeof(Elf64_Phdr),	/* prog hdr size */
 		.e_shentsize = sizeof(Elf64_Shdr),
 
-		.e_phnum = 1,		/* number of entries */
-		.e_shnum = 0,		/* entries in sections hdrs tbl */
-		.e_shstrndx = SHN_UNDEF	/* section hdr tbl idx of the entry associated with the section name str tbl */
+		.e_phnum = 1,				/* number of prog hdrs */
+		.e_shnum = 0,				/* number of sect hdrs */
+		.e_shstrndx = SHN_UNDEF			/* index of tbl of sections' names */
 	};
 
 	const Elf64_Phdr program_header =
 	{
 		.p_type = PT_LOAD,
-		.p_offset = ELF_START_OFF,	/* file pos off */
-		.p_vaddr = ELF_ENTRY_VA,
-		.p_paddr = 0xDED,
+		.p_offset = ELF_START_OFF,		/* file pos off */
+		.p_vaddr = ELF_ENTRY_VA,		/* entry virtual addr */
+		.p_paddr = 0xDED,			/* rofl addr */
+                                                	
+		.p_filesz = 0,				/* needed fixup */
+		.p_memsz = 0,				/* needed fixup */
 
-		.p_filesz = 0,			/* needed fixup */
-		.p_memsz = 0,			/* needed fixup */
-
-		.p_flags = PF_R | PF_X,
-		.p_align = PAGE_SIZE
+		.p_flags = PF_R | PF_X,			/* section rwx */
+		.p_align = PAGE_SIZE			/* algnment */
 	};
 
 	fwrite(&elf_header, sizeof(elf_header), 1, ELF);
