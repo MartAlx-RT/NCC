@@ -1,53 +1,111 @@
-#define write_asm(fmt, ...)	fprintf(ASM_OUT, fmt, ##__VA_ARGS__)
+/* All useg registers are 64-bit registers */
 
-#define MOV_RR(dst, src)	emit_mov(MOV_REG_TO_MEM, MOD_R, src, (const operand_t){ .reg = dst }, 0)
-#define MOV_RM(dst, src, disp)	emit_mov(MOV_MEM_TO_REG, MOD_M_DISP, dst, (const operand_t){ .reg = src }, disp)
-#define MOV_MR(dst, src, disp)	emit_mov(MOV_REG_TO_MEM, MOD_M_DISP, src, (const operand_t){ .reg = dst }, disp)
-#define MOV_RI(dst, i)		emit_mov(MOV_IMM_TO_REG, MOD_R, dst, (const operand_t){ .imm = i }, 0)
+#define REX_W	0x48	/* prefix for use 64-bit operand size */
 
-#define PUSH_M(base, disp)	emit_push(PUSH_MEM, MOD_M_DISP, (const operand_t){ .reg = base }, disp)
-#define PUSH_R(r)		emit_push(PUSH_REG, MOD_R, (const operand_t){ .reg = r }, 0)
-#define PUSH_I(i)		emit_push(PUSH_IMM, MOD_R, (const operand_t){ .imm = i }, 0)
+/* ------------------------- MOV --------------------------- */
+/* mov reg, reg */
+#define GEN_MOV_RR(dst, src)		emit_mov(MOV_REG_TO_MEM, MOD_R, src, (const operand_t){ .reg = dst }, 0)
 
-#define POP_M(base, disp)	emit_pop(POP_MEM, MOD_M_DISP, (const operand_t){ .reg = base }, disp)
-#define POP_R(r)		emit_pop(POP_REG, MOD_R, (const operand_t){ .reg = r }, 0)
+/* mov reg, [base + disp32] */
+#define GEN_MOV_RM(dst, src, disp)	emit_mov(MOV_MEM_TO_REG, MOD_M_DISP, dst, (const operand_t){ .reg = src }, disp)
 
-#define ENTER(shift)		emit_enter(shift)
-#define LEAVE			emit_leave()
-#define RET			emit_ret()
-#define SYSCALL			emit_syscall()
+/* mov [base + disp32], reg */
+#define GEN_MOV_MR(dst, src, disp)	emit_mov(MOV_REG_TO_MEM, MOD_M_DISP, src, (const operand_t){ .reg = dst }, disp)
 
-#define LEA(r, b, disp)		emit_lea(MOD_M_DISP, (const operand_t){ .reg = r }, (const operand_t){ .reg = b }, disp)
+/* mov reg, imm64 */
+#define GEN_MOV_RI(dst, i)		emit_mov(MOV_IMM_TO_REG, MOD_R, dst, (const operand_t){ .imm = i }, 0)
 
-#define JMP_R(r)		emit_abs_branch(B_JMP_ABS, MOD_R, (const operand_t){ .reg = r })
-#define CALL_R(r)		emit_abs_branch(B_CALL_ABS, MOD_R, (const operand_t){ .reg = r })
-#define LBL(l, ...)		emit_lbl(l, ##__VA_ARGS__)
+/* lea reg, [base + disp32] */
+#define GEN_LEA(r, b, disp)		emit_lea(MOD_M_DISP, (const operand_t){ .reg = r }, (const operand_t){ .reg = b }, disp)
 
-#define CALL_L(l, ...)		emit_rel_branch(B_CALL_REL, l, ##__VA_ARGS__)
-#define JMP_L(l, ...)		emit_rel_branch(B_JMP_REL, l, ##__VA_ARGS__)
-#define JE(l, ...)		emit_rel_branch(B_JE, l, ##__VA_ARGS__)
-#define JNE(l, ...)		emit_rel_branch(B_JNE, l, ##__VA_ARGS__)
-#define JG(l, ...)		emit_rel_branch(B_JG, l, ##__VA_ARGS__)
-#define JL(l, ...)		emit_rel_branch(B_JL, l, ##__VA_ARGS__)
+/* ------------------------- PUSH --------------------------- */
 
-/* arifmetics
- * void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
-*/
-#define ADD_RR(dst, src)	emit_arifm(ARIFM_ADD_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
-#define ADD_RI(dst, i)		emit_arifm(ARIFM_ADD_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
-#define SUB_RR(dst, src)	emit_arifm(ARIFM_SUB_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
-#define SUB_RI(dst, i)		emit_arifm(ARIFM_SUB_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
-#define IMUL_RR(dst, src)	emit_arifm(ARIFM_IMUL_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
-#define CMP_RR(dst, src)	emit_arifm(ARIFM_CMP_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
-#define CMP_RI(r, i)		emit_arifm(ARIFM_CMP_REG_TO_IMM, (const operand_t){ .reg = r }, (const operand_t){ .imm = i })
-#define IDIV_R(src)		emit_arifm(ARIFM_IDIV_REG, (const operand_t){}, (const operand_t){ .reg = src })
-#define SHL_RI(dst, c)		emit_arifm(ARIFM_SHL_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
-#define SHR_RI(dst, c)		emit_arifm(ARIFM_SHR_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
+/* push [base + disp32] */
+#define GEN_PUSH_M(base, disp)	emit_push(PUSH_MEM, MOD_M_DISP, (const operand_t){ .reg = base }, disp)
 
-#define REX_W	0x48
+/* push reg */
+#define GEN_PUSH_R(r)		emit_push(PUSH_REG, MOD_R, (const operand_t){ .reg = r }, 0)
+
+/* push imm32 */
+#define GEN_PUSH_I(i)		emit_push(PUSH_IMM, MOD_R, (const operand_t){ .imm = i }, 0)
+
+/* ------------------------- POP --------------------------- */
+/* pop [base + disp32] */
+#define GEN_POP_M(base, disp)	emit_pop(POP_MEM, MOD_M_DISP, (const operand_t){ .reg = base }, disp)
+
+/* pop reg */
+#define GEN_POP_R(r)		emit_pop(POP_REG, MOD_R, (const operand_t){ .reg = r }, 0)
+
+/* ------------ GEN_ENTER, GEN_LEAVE, GEN_RET, GEN_SYSCALL------------------ */
+/* enter shift16, 0 */
+// TODO: add prefix to define
+#define GEN_ENTER(shift)	emit_enter(shift)
+
+/* leave */
+#define GEN_LEAVE		emit_leave()
+
+/* ret */
+#define GEN_RET			emit_ret()
+
+/* syscall */
+#define GEN_SYSCALL		emit_syscall()
+
+/* ------------------------- BRANCH --------------------------- */
+/* jmp reg */
+#define GEN_JMP_R(r)		emit_abs_branch(B_JMP_ABS, MOD_R, (const operand_t){ .reg = r })
+
+/* call reg */
+#define GEN_CALL_R(r)		emit_abs_branch(B_CALL_ABS, MOD_R, (const operand_t){ .reg = r })
+
+/* declare label, for example: GEN_LBL("label_name%d", label_index) */
+#define GEN_LBL(l, ...)		emit_lbl(l, ##__VA_ARGS__)
+
+/* call label */
+#define GEN_CALL_L(l, ...)	emit_rel_branch(B_CALL_REL, l, ##__VA_ARGS__)
+
+/* jmp label */
+#define GEN_JMP_L(l, ...)	emit_rel_branch(B_JMP_REL, l, ##__VA_ARGS__)
+
+/* other jumps */
+#define GEN_JE(l, ...)		emit_rel_branch(B_JE, l, ##__VA_ARGS__)
+#define GEN_JNE(l, ...)		emit_rel_branch(B_JNE, l, ##__VA_ARGS__)
+#define GEN_JG(l, ...)		emit_rel_branch(B_JG, l, ##__VA_ARGS__)
+#define GEN_JL(l, ...)		emit_rel_branch(B_JL, l, ##__VA_ARGS__)
+#define GEN_JGE(l, ...)		emit_rel_branch(B_JGE, l, ##__VA_ARGS__)
+#define GEN_JLE(l, ...)		emit_rel_branch(B_JLE, l, ##__VA_ARGS__)
+
+/* add reg, reg */
+#define GEN_ADD_RR(dst, src)	emit_arifm(ARIFM_ADD_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
+
+/* add reg, imm32 */
+#define GEN_ADD_RI(dst, i)	emit_arifm(ARIFM_ADD_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
+
+/* sub reg, reg */
+#define GEN_SUB_RR(dst, src)	emit_arifm(ARIFM_SUB_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
+
+/* sub reg, imm32 */
+#define GEN_SUB_RI(dst, i)	emit_arifm(ARIFM_SUB_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = i })
+
+/* imul reg, reg */
+#define GEN_IMUL_RR(dst, src)	emit_arifm(ARIFM_IMUL_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
+
+/* cmp reg, reg */
+#define GEN_CMP_RR(dst, src)	emit_arifm(ARIFM_CMP_REG_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .reg = src })
+
+/* cmp reg, imm32 */
+#define GEN_CMP_RI(r, i)	emit_arifm(ARIFM_CMP_REG_TO_IMM, (const operand_t){ .reg = r }, (const operand_t){ .imm = i })
+
+/* idiv reg */
+#define GEN_IDIV_R(src)		emit_arifm(ARIFM_IDIV_REG, (const operand_t){}, (const operand_t){ .reg = src })
+
+/* shl reg, imm8 */
+#define GEN_SHL_RI(dst, c)	emit_arifm(ARIFM_SHL_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
+
+/* shr reg, imm8 */
+#define GEN_SHR_RI(dst, c)	emit_arifm(ARIFM_SHR_IMM_TO_REG, (const operand_t){ .reg = dst }, (const operand_t){ .imm = c })
 
 #define write_nasm(code, ...)	\
-	do { assert(NASM); fprintf(NASM, code, ##__VA_ARGS__); } while(0)
+	do { fprintf(NASM, code, ##__VA_ARGS__); } while(0)
 
 #define write_elf(type, ...)								\
 	do										\
@@ -62,8 +120,4 @@
 #define write_w(...)	write_elf(uint16_t, __VA_ARGS__)
 #define write_d(...)	write_elf(uint32_t, __VA_ARGS__)
 #define write_q(...)	write_elf(uint64_t, __VA_ARGS__)
-
-#define crnt_pos	ftell(ELF)
-#define elf_seek(off)	fseek(ELF, off, SEEK_SET)
-#define elf_seek_end()	fseek(ELF, 0, SEEK_END)
 

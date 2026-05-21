@@ -42,6 +42,8 @@ typedef enum op_t
 	OP_AND,
 	OP_NEQ,
 	OP_MOD,
+	OP_GEQ,
+	OP_LEQ,
 } op_t;
 
 typedef enum kword_t
@@ -132,6 +134,8 @@ static const lex_t LEXS[] =
 		{ "]", CLS_BRK },
 		{ "==", EQ },
 		{ "!=", NEQ },
+		{ ">=", GEQ },
+		{ "<=", LEQ },
 		{ "=", ASSIGN },
 		{ "+", ADD },
 		{ "-", SUB },

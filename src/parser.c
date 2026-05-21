@@ -572,7 +572,12 @@ static node_t *GetCompExpr(node_data_t *data[], symtbl_t *symtbl)
 	if(node == NULL)
 		return NULL;
 
-	if(IS_(GREATER, **data) || IS_(LESS, **data) || IS_(EQ, **data) || IS_(NEQ, **data))
+	if(IS_(GREATER, **data)		||
+		IS_(LESS, **data)	||
+		IS_(EQ, **data)		||
+		IS_(GEQ, **data)	||
+		IS_(LEQ, **data)	||
+		IS_(NEQ, **data))
 	{
 		node_data_t op = **data;
 		(*data)++;

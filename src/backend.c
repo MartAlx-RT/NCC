@@ -16,6 +16,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#define SIZEOF_BASETYPE		8
+#define LOG2_OF_SIZEOF_BASETYPE	3
+
 typedef enum global_type_t
 {
 	GLOB_CONST,
@@ -90,10 +93,10 @@ int CompileTree(const node_t *ast, FILE *elf, FILE *nasm)
 	ASM_OUT = nasm;
 	emitter_init(elf, nasm);
 
-	CALL_L("main");
-	MOV_RR(RDI, RAX);
-	MOV_RI(RAX, 0x3c);
-	SYSCALL;
+	GEN_CALL_L("main");
+	GEN_MOV_RR(RDI, RAX);
+	GEN_MOV_RI(RAX, 0x3c);
+	GEN_SYSCALL;
 
 	child_t *decl = ast->child;
 	while(decl)
@@ -116,7 +119,6 @@ int CompileTree(const node_t *ast, FILE *elf, FILE *nasm)
 	GenGlobals();
 
 	emitter_fixup();
-	emitter_free_names();
 	emitter_deinit();
 
 	return COMPILE_STATUS;
@@ -138,7 +140,7 @@ static size_t NewGlobal(const global_t global)
 
 static void GenGlobals(void)
 {
-	fseek(emitter_get_elf(), (emitter_get_elf_pos()+7)/8 * 8, SEEK_SET);
+	fseek(emitter_get_elf(), (emitter_get_elf_pos()+7)/8 * 8, SEEK_SET);	// aligning
 
 	for(size_t i = 0; i < GLOBALS.size; i++)
 	{
@@ -149,7 +151,7 @@ static void GenGlobals(void)
 			const ssize_t current_pos = emitter_get_elf_pos();
 
 			fseek(emitter_get_elf(), GLOBALS.globals[i].pos, SEEK_SET);
-			MOV_RI(RAX, (ssize_t)(ELF_ENTRY_VA - ELF_START_OFF) + current_pos);
+			GEN_MOV_RI(RAX, (ssize_t)(ELF_ENTRY_VA - ELF_START_OFF) + current_pos);
 			fseek(emitter_get_elf(), current_pos, SEEK_SET);
 
 			while(*str)	write_q((uint8_t)*str++);
@@ -201,6 +203,8 @@ static void GenOp(const node_t *ast)
 				case OP_LESS:
 				case OP_EQ:
 				case OP_NEQ:
+				case OP_GEQ:
+				case OP_LEQ:
 				case OP_OR:
 				case OP_AND:	GenArifm(ast);	return;
 
@@ -239,9 +243,9 @@ static void GenStr(const node_t *ast)
 	};
 	NewGlobal(global);
 
-	MOV_RI(RAX, 0);		// not true mov, just a filler
-	SHR_RI(RAX, 3);
-	PUSH_R(RAX);
+	GEN_MOV_RI(RAX, 0);		// not true mov, just a filler
+	GEN_SHR_RI(RAX, LOG2_OF_SIZEOF_BASETYPE);
+	GEN_PUSH_R(RAX);
 }
 
 static void GenOpSeq(const node_t *ast)
@@ -271,18 +275,18 @@ static void GenArifm(const node_t *ast)
 	switch(ast->data.type)
 	{
 		case TP_NUM:
-			PUSH_I((int32_t)ast->data.val.num);
+			GEN_PUSH_I((int32_t)ast->data.val.num);
 			return;
 		case TP_VAR:
-			PUSH_M(RBP, 8*(int32_t)ast->data.val.id);
+			GEN_PUSH_M(RBP, SIZEOF_BASETYPE*(int32_t)ast->data.val.id);
 			return;
 		case TP_DEREF:
 			GenDeref(ast);
 			return;
 		case TP_TAKEADDR:
-			LEA(RAX, RBP, 8*(int32_t)ast->data.val.id);
-			SHR_RI(RAX, 3);
-			PUSH_R(RAX);
+			GEN_LEA(RAX, RBP, SIZEOF_BASETYPE*(int32_t)ast->data.val.id);
+			GEN_SHR_RI(RAX, LOG2_OF_SIZEOF_BASETYPE);
+			GEN_PUSH_R(RAX);
 			return;
 		case TP_OP:
 			if(!IS_BINNODE(ast))
@@ -291,38 +295,40 @@ static void GenArifm(const node_t *ast)
 			GenExpr(LEFT(ast));
 			GenExpr(RIGHT(ast));
 
-			POP_R(RCX);
-			POP_R(RAX);
+			GEN_POP_R(RCX);
+			GEN_POP_R(RAX);
 
 			switch(ast->data.val.op)
 			{
 				case OP_ADD:
-					ADD_RR(RAX, RCX);
+					GEN_ADD_RR(RAX, RCX);
 					break;
 				case OP_SUB:
-					SUB_RR(RAX, RCX);
+					GEN_SUB_RR(RAX, RCX);
 					break;
 				case OP_MUL:
-					IMUL_RR(RAX, RCX);
+					GEN_IMUL_RR(RAX, RCX);
 					break;
 				case OP_DIV:
 				case OP_MOD:
-					MOV_RI(RDX, 0);
-					IDIV_R(RCX);
+					GEN_MOV_RI(RDX, 0);
+					GEN_IDIV_R(RCX);
 					break;
 				case OP_GREATER:
 				case OP_LESS:
 				case OP_ASSIGN:
 				case OP_EQ:			/* implemented in GenComp, GenAnd, GenOr */
 				case OP_NEQ:			/* implemented in GenComp, GenAnd, GenOr */
+				case OP_GEQ:
+				case OP_LEQ:
 				case OP_OR:
 				case OP_AND:
 
 				default:	err_exit_msg("invalid operation");
 			}
 
-			if(ast->data.val.op == OP_MOD)	PUSH_R(RDX);
-			else				PUSH_R(RAX);
+			if(ast->data.val.op == OP_MOD)	GEN_PUSH_R(RDX);
+			else				GEN_PUSH_R(RAX);
 
 			return;
 		case TP_EOF:
@@ -351,8 +357,8 @@ static void GenDeclFunc(const node_t *ast)
 		err_exit_msg("invalid declaration");
 
 	node_t *body = ast->child->node, *args = ast->child->next->node;
-	LBL("%s", ast->data.val.name);
-	ENTER(8*(uint16_t)(body->data.val.id + args->data.val.id));
+	GEN_LBL("%s", ast->data.val.name);
+	GEN_ENTER(SIZEOF_BASETYPE*(uint16_t)(body->data.val.id + args->data.val.id));
 
 	GenOpSeq(RIGHT(ast));
 }
@@ -420,15 +426,15 @@ static void GenOr(const node_t *ast)
 	GenExpr(RIGHT(ast));
 	GenExpr(LEFT(ast));
 
-	POP_R(RAX);	POP_R(RDX);
-	CMP_RI(RAX, 0);	JNE(".L%lu", LBL_CNT);
+	GEN_POP_R(RAX);	GEN_POP_R(RDX);
+	GEN_CMP_RI(RAX, 0);	GEN_JNE(".L%lu", LBL_CNT);
 
-	CMP_RI(RDX, 0);	JNE(".L%lu", LBL_CNT);
+	GEN_CMP_RI(RDX, 0);	GEN_JNE(".L%lu", LBL_CNT);
 
-	PUSH_I(0);	JMP_L(".L%lu", LBL_CNT+1);
-	LBL(".L%lu", LBL_CNT);
-	PUSH_I(1);
-	LBL(".L%lu", LBL_CNT+1);
+	GEN_PUSH_I(0);	GEN_JMP_L(".L%lu", LBL_CNT+1);
+	GEN_LBL(".L%lu", LBL_CNT);
+	GEN_PUSH_I(1);
+	GEN_LBL(".L%lu", LBL_CNT+1);
 
 	LBL_CNT += 2;
 }
@@ -446,16 +452,16 @@ static void GenAnd(const node_t *ast)
 	GenExpr(RIGHT(ast));
 	GenExpr(LEFT(ast));
 
-	POP_R(RAX);	POP_R(RDX);
+	GEN_POP_R(RAX);	GEN_POP_R(RDX);
 
-	CMP_RI(RAX, 0);	JE(".L%lu", LBL_CNT);
-	CMP_RI(RDX, 0);	JE(".L%lu", LBL_CNT);
+	GEN_CMP_RI(RAX, 0);	GEN_JE(".L%lu", LBL_CNT);
+	GEN_CMP_RI(RDX, 0);	GEN_JE(".L%lu", LBL_CNT);
 
-	PUSH_I(1);	JMP_L(".L%lu", LBL_CNT+1);
+	GEN_PUSH_I(1);	GEN_JMP_L(".L%lu", LBL_CNT+1);
 
-	LBL(".L%lu", LBL_CNT);
-	PUSH_I(0);
-	LBL(".L%lu", LBL_CNT+1);
+	GEN_LBL(".L%lu", LBL_CNT);
+	GEN_PUSH_I(0);
+	GEN_LBL(".L%lu", LBL_CNT+1);
 
 	LBL_CNT += 2;
 }
@@ -472,14 +478,16 @@ static void GenComp(const node_t *ast, const op_t gle)
 	GenExpr(RIGHT(ast));
 	GenExpr(LEFT(ast));
 
-	POP_R(RAX);	POP_R(RDX);
-	CMP_RR(RAX, RDX);
+	GEN_POP_R(RAX);	GEN_POP_R(RDX);
+	GEN_CMP_RR(RAX, RDX);
 	switch(gle)
 	{
-		case OP_GREATER:	JG(".L%lu", LBL_CNT);	break;
-		case OP_LESS:		JL(".L%lu", LBL_CNT);	break;
-		case OP_EQ:		JE(".L%lu", LBL_CNT);	break;
-		case OP_NEQ:		JNE(".L%lu", LBL_CNT);	break;
+		case OP_GREATER:	GEN_JG(".L%lu", LBL_CNT);	break;
+		case OP_LESS:		GEN_JL(".L%lu", LBL_CNT);	break;
+		case OP_EQ:		GEN_JE(".L%lu", LBL_CNT);	break;
+		case OP_NEQ:		GEN_JNE(".L%lu", LBL_CNT);	break;
+		case OP_GEQ:		GEN_JGE(".L%lu", LBL_CNT);	break;
+		case OP_LEQ:		GEN_JLE(".L%lu", LBL_CNT);	break;
 
 		case OP_ADD:
 		case OP_SUB:
@@ -492,11 +500,11 @@ static void GenComp(const node_t *ast, const op_t gle)
 		default:		err_exit_msg("jmptype out of range");
 	}
 
-	PUSH_I(0);	JMP_L(".L%lu", LBL_CNT+1);
+	GEN_PUSH_I(0);	GEN_JMP_L(".L%lu", LBL_CNT+1);
 
-	LBL(".L%lu", LBL_CNT);
-	PUSH_I(1);
-	LBL(".L%lu", LBL_CNT+1);
+	GEN_LBL(".L%lu", LBL_CNT);
+	GEN_PUSH_I(1);
+	GEN_LBL(".L%lu", LBL_CNT+1);
 
 	LBL_CNT += 2;
 }
@@ -516,7 +524,7 @@ static void GenExpr(const node_t *ast)
 			break;
 		case TP_CALL_FUNC:
 			GenCallFunc(ast);
-			PUSH_R(RAX);
+			GEN_PUSH_R(RAX);
 			break;
 		case TP_DEREF:
 			GenDeref(ast);
@@ -541,6 +549,8 @@ static void GenExpr(const node_t *ast)
 				case OP_LESS:
 				case OP_EQ:
 				case OP_NEQ:
+				case OP_GEQ:
+				case OP_LEQ:
 					GenComp(ast, ast->data.val.op);
 					break;
 				case OP_ASSIGN:
@@ -581,8 +591,8 @@ static void GenIf(const node_t *ast)
 
 	size_t else_lbl = LBL_CNT++, endif_lbl = LBL_CNT++;
 	
-	POP_R(RAX);
-	CMP_RI(RAX, 0);	JE(".L%lu", else_lbl);
+	GEN_POP_R(RAX);
+	GEN_CMP_RI(RAX, 0);	GEN_JE(".L%lu", else_lbl);
 
 	/* 'if' body */
 	if(CHILD_EXISTS(child))
@@ -591,14 +601,14 @@ static void GenIf(const node_t *ast)
 		err_exit_msg("missing 'if' body");
 	child = child->next;
 
-	JMP_L(".L%lu", endif_lbl);
-	LBL(".L%lu", else_lbl);
+	GEN_JMP_L(".L%lu", endif_lbl);
+	GEN_LBL(".L%lu", else_lbl);
 
 	if(CHILD_EXISTS(child))
 		GenOpSeq(child->node);
 
 	/* endif */
-	LBL(".L%lu", endif_lbl);
+	GEN_LBL(".L%lu", endif_lbl);
 }
 
 static void GenWhile(const node_t *ast)
@@ -613,17 +623,17 @@ static void GenWhile(const node_t *ast)
 
 	size_t cond_lbl = LOOP_LBL_CNT++, end_lbl = LOOP_LBL_CNT++;
 
-	LBL(".Lloop%lu", cond_lbl);
+	GEN_LBL(".Lloop%lu", cond_lbl);
 
 	GenExpr(LEFT(ast));
 
-	POP_R(RAX);
-	CMP_RI(RAX, 0);	JE(".Lloop%lu", end_lbl);
+	GEN_POP_R(RAX);
+	GEN_CMP_RI(RAX, 0);	GEN_JE(".Lloop%lu", end_lbl);
 
 	GenOpSeq(RIGHT(ast));
 
-	JMP_L(".Lloop%lu", cond_lbl);
-	LBL(".Lloop%lu", end_lbl);
+	GEN_JMP_L(".Lloop%lu", cond_lbl);
+	GEN_LBL(".Lloop%lu", end_lbl);
 }
 
 static void GenAssign(const node_t *ast)
@@ -646,7 +656,7 @@ static void GenAssign(const node_t *ast)
 	/* l_val */
 	if(l_val->data.type == TP_VAR)
 	{
-		POP_M(RBP, 8*(int32_t)l_val->data.val.id);
+		GEN_POP_M(RBP, SIZEOF_BASETYPE*(int32_t)l_val->data.val.id);
 	}
 	else if(l_val->data.type == TP_DEREF)
 	{
@@ -655,9 +665,9 @@ static void GenAssign(const node_t *ast)
 
 		GenExpr(l_val->child->node);
 
-		POP_R(RAX);
-		SHL_RI(RAX, 3);
-		POP_M(RAX, 0);
+		GEN_POP_R(RAX);
+		GEN_SHL_RI(RAX, LOG2_OF_SIZEOF_BASETYPE);
+		GEN_POP_M(RAX, 0);
 	}
 	else
 		err_exit_msg("lvalue must be variable or dereference ptr");
@@ -690,8 +700,8 @@ static void GenCallFunc(const node_t *ast)
 		}
 	}
 
-	CALL_L("%s", ast->data.val.name);
-	ADD_RI(RSP, 8*(int32_t)param_node->data.val.id);
+	GEN_CALL_L("%s", ast->data.val.name);
+	GEN_ADD_RI(RSP, SIZEOF_BASETYPE*(int32_t)param_node->data.val.id);
 }
 
 static void GenReturn(const node_t *ast)
@@ -704,11 +714,11 @@ static void GenReturn(const node_t *ast)
 	if(ast->child && ast->child->node)
 	{
 		GenExpr(ast->child->node);
-		POP_R(RAX);
+		GEN_POP_R(RAX);
 	}
-	else	MOV_RI(RAX, 0);
+	else	GEN_MOV_RI(RAX, 0);
 
-	LEAVE;	RET;
+	GEN_LEAVE;	GEN_RET;
 }
 
 static void GenBreak(const node_t *ast)
@@ -718,7 +728,7 @@ static void GenBreak(const node_t *ast)
 	if(!IS_(BREAK, ast->data))
 		err_exit_msg("is not 'break'");
 
-	JMP_L(".Lloop%lu", LOOP_LBL_CNT-1);
+	GEN_JMP_L(".Lloop%lu", LOOP_LBL_CNT-1);
 }
 
 static void GenContinue(const node_t *ast)
@@ -728,7 +738,7 @@ static void GenContinue(const node_t *ast)
 	if(!IS_(CONTINUE, ast->data))
 		err_exit_msg("is not 'continue'");
 
-	JMP_L(".Lloop%lu", LOOP_LBL_CNT-2);
+	GEN_JMP_L(".Lloop%lu", LOOP_LBL_CNT-2);
 }
 
 static void GenDeref(const node_t *ast)
@@ -742,8 +752,8 @@ static void GenDeref(const node_t *ast)
 
 	GenExpr(ast->child->node);
 
-	POP_R(RAX);
-	SHL_RI(RAX, 3);
-	PUSH_M(RAX, 0);
+	GEN_POP_R(RAX);
+	GEN_SHL_RI(RAX, LOG2_OF_SIZEOF_BASETYPE);
+	GEN_PUSH_M(RAX, 0);
 }
 /*---------------------------------------------*/

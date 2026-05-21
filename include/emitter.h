@@ -63,6 +63,8 @@ typedef enum branch_t
 	B_JNE		= 0x85,
 	B_JG		= 0x8f,
 	B_JL		= 0x8c,
+	B_JGE		= 0x8d,
+	B_JLE		= 0x8e,
 
 	B_JMP_ABS	= 0xff,
 	B_CALL_ABS	= 0xff

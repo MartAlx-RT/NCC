@@ -6,7 +6,7 @@
 static const char *NODE_TYPE_NAME[] =
 	{"eof", "root", "number", "operation", "op. sequence", "identifier", "parameters", "variable", "keyword", "symbol", "decl function", "call function", "literal", "&", "[]"};
 static const char *OP_NAME[] =
-	{"+", "-", "*", "/", "\\>", "\\<", "=", "==", "or", "and", "!=", "%"};
+	{"+", "-", "*", "/", "\\>", "\\<", "=", "==", "or", "and", "!=", "%", ">=", "<="};
 static const char *KWORD_NAME[] =
 	{"if", "else", "while", "for", "continue", "break", "return", "pass", "asm", "func"};
 static const char *SYMB_NAME[] =

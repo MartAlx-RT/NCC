@@ -13,6 +13,8 @@
 #define CLS_BRK				(const node_data_t){.type = TP_SYMB, .val.symb = SYM_CLS_BRK}
 #define EQ 				(const node_data_t){.type = TP_OP, .val.op = OP_EQ}
 #define NEQ 				(const node_data_t){.type = TP_OP, .val.op = OP_NEQ}
+#define GEQ				(const node_data_t){.type = TP_OP, .val.op = OP_GEQ}
+#define LEQ				(const node_data_t){.type = TP_OP, .val.op = OP_LEQ}
 #define ASSIGN 				(const node_data_t){.type = TP_OP, .val.op = OP_ASSIGN}
 #define ADD 				(const node_data_t){.type = TP_OP, .val.op = OP_ADD}
 #define SUB 				(const node_data_t){.type = TP_OP, .val.op = OP_SUB}

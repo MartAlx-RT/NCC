@@ -14,7 +14,7 @@
 #pragma GCC push_options
 #pragma GCC optimize ("-fno-stack-protector")
 
-#define MODRM(mod, r, rm)	((uint8_t)((mod<<6)|(r<<3)|(rm)))
+#define GEN_MODRM(mod, r, rm)	((uint8_t)((mod<<6)|(r<<3)|(rm)))
 
 static FILE *NASM = NULL;
 static FILE *ELF = NULL;
@@ -22,6 +22,7 @@ static fixups_t FIXUPS = {};
 
 /* common functions */ 
 
+/* initializes file ptrs, write elf header */
 void emitter_init(FILE *elf, FILE *nasm)
 {
 	assert(elf);	assert(nasm);
@@ -76,14 +77,22 @@ void emitter_init(FILE *elf, FILE *nasm)
 		.p_align = PAGE_SIZE			/* algnment */
 	};
 
+	/* write header to a file */
 	fwrite(&elf_header, sizeof(elf_header), 1, ELF);
 	fwrite(&program_header, sizeof(program_header), 1, ELF);
 
 	fseek(emitter_get_elf(), ELF_START_OFF, SEEK_SET);
 }
 
+/* frees alloced, fixups elf header */
 void emitter_deinit(void)
 {
+	for(size_t i = 0; i < FIXUPS.lbls.size; i++)
+		free(FIXUPS.lbls.lbls[i].name);
+
+	for(size_t i = 0; i < FIXUPS.refs.size; i++)
+		free(FIXUPS.refs.refs[i].name);
+
 	free(FIXUPS.refs.refs);	FIXUPS.refs.refs = NULL;
 	free(FIXUPS.lbls.lbls);	FIXUPS.lbls.lbls = NULL;
 
@@ -101,15 +110,6 @@ void emitter_deinit(void)
 	NASM = ELF = NULL;
 }
 
-void emitter_free_names(void)
-{
-	for(size_t i = 0; i < FIXUPS.lbls.size; i++)
-		free(FIXUPS.lbls.lbls[i].name);
-
-	for(size_t i = 0; i < FIXUPS.refs.size; i++)
-		free(FIXUPS.refs.refs[i].name);
-}
-
 ssize_t emitter_get_elf_pos(void)
 {
 	return ftell(ELF);
@@ -120,6 +120,7 @@ FILE *emitter_get_elf(void)
 	return ELF;
 }
 
+/* adds reference to label */
 void emitter_fixup_add_ref(const ref_t ref)
 {
 	if(FIXUPS.refs.size >= FIXUPS.refs.cap)
@@ -132,6 +133,7 @@ void emitter_fixup_add_ref(const ref_t ref)
 	FIXUPS.refs.refs[FIXUPS.refs.size++] = ref;
 }
 
+/* creates formatted string */
 char *emitter_make_msg(const char *fmt, va_list args)
 {
 	va_list vprintf_args;
@@ -151,6 +153,7 @@ char *emitter_make_msg(const char *fmt, va_list args)
 	return msg;
 }
 
+/* add label */
 void emitter_fixup_add_lbl(const lbl_t lbl)
 {
 	if(FIXUPS.lbls.size >= FIXUPS.lbls.cap)
@@ -163,6 +166,7 @@ void emitter_fixup_add_lbl(const lbl_t lbl)
 	FIXUPS.lbls.lbls[FIXUPS.lbls.size++] = lbl;
 }
 
+/* fixups instruction with labels */
 void emitter_fixup(void)
 {
 	const ssize_t current_pos = emitter_get_elf_pos();
@@ -191,10 +195,11 @@ void emitter_fixup(void)
 				fprintf(stderr, "`%s`: distance is too large\n", lbl->name);
 
 			if(ref->type == B_CALL_REL || ref->type == B_JMP_REL)
-				elf_seek(ref->pos - 5);
+				fseek(emitter_get_elf(), ref->pos - 5, SEEK_SET);
 			else
 			{
-				elf_seek(ref->pos - 6);	write_b(0x0f);
+				fseek(emitter_get_elf(), ref->pos - 6, SEEK_SET);
+				write_b(0x0f);
 			}
 			write_b(ref->type);	write_d((uint32_t)distance);
 		}
@@ -218,7 +223,7 @@ void emit_mov(const mov_t type, const mod_t mod, const reg_t reg, const operand_
 
 		case MOV_REG_TO_MEM:
 		case MOV_MEM_TO_REG:
-					write_b(type, MODRM(mod, reg, op.reg));
+					write_b(type, GEN_MODRM(mod, reg, op.reg));
 					if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 					break;
 
@@ -235,7 +240,7 @@ void emit_push(const push_t type, mod_t mod, const operand_t op, const int32_t d
 		case PUSH_IMM:	write_b(PUSH_IMM);	write_d((uint32_t)op.imm);	break;
 
 		case PUSH_MEM:
-				write_b(PUSH_MEM, MODRM(mod, 6, op.reg));
+				write_b(PUSH_MEM, GEN_MODRM(mod, 6, op.reg));
 				if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 				break;
 
@@ -250,7 +255,7 @@ void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t dis
 		case POP_REG:	write_b((uint8_t)(POP_REG + op.reg));	break;
 
 		case POP_MEM:
-				write_b(POP_MEM, MODRM(mod, 0, op.reg));
+				write_b(POP_MEM, GEN_MODRM(mod, 0, op.reg));
 				if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 				break;
 
@@ -260,7 +265,7 @@ void emit_pop(const pop_t type, mod_t mod, const operand_t op, const int32_t dis
 
 void emit_abs_branch(const branch_t type, const operand_t op)
 {
-	write_b((uint8_t)type, MODRM(6, 4, op.reg));
+	write_b((uint8_t)type, GEN_MODRM(6, 4, op.reg));
 }
 
 void emit_rel_branch(const branch_t type, const char *fmt, ...)
@@ -334,32 +339,32 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 		case ARIFM_ADD_REG_TO_REG:
 		case ARIFM_SUB_REG_TO_REG:
 		case ARIFM_CMP_REG_TO_REG:
-			write_b((uint8_t)type, MODRM(MOD_R, dst.reg, src.reg));
+			write_b((uint8_t)type, GEN_MODRM(MOD_R, dst.reg, src.reg));
 			break;
 
 		case ARIFM_CMP_REG_TO_IMM:
-			write_b(ARIFM_CMP_REG_TO_IMM, MODRM(MOD_R, 7, dst.reg));
+			write_b(ARIFM_CMP_REG_TO_IMM, GEN_MODRM(MOD_R, 7, dst.reg));
 			write_d((uint32_t)src.imm);
 			break;
 
 		/* without unique opcode */
 		case ARIFM_ADD_IMM_TO_REG:
-			write_b(0x83, MODRM(MOD_R, 0, dst.reg), (uint8_t)src.imm);
+			write_b(0x83, GEN_MODRM(MOD_R, 0, dst.reg), (uint8_t)src.imm);
 			break;
 		case ARIFM_SUB_IMM_TO_REG:
-			write_b(0x83, MODRM(MOD_R, 5, dst.reg), (uint8_t)src.imm);
+			write_b(0x83, GEN_MODRM(MOD_R, 5, dst.reg), (uint8_t)src.imm);
 			break;
 		case ARIFM_SHL_IMM_TO_REG:
-			write_b(0xc1, MODRM(MOD_R, 4, dst.reg), (uint8_t)src.imm);
+			write_b(0xc1, GEN_MODRM(MOD_R, 4, dst.reg), (uint8_t)src.imm);
 			break;
 		case ARIFM_SHR_IMM_TO_REG:
-			write_b(0xc1, MODRM(MOD_R, 5, dst.reg), (uint8_t)src.imm);
+			write_b(0xc1, GEN_MODRM(MOD_R, 5, dst.reg), (uint8_t)src.imm);
 			break;
 		case ARIFM_IMUL_REG_TO_REG:
-			write_b(0x0f, 0xaf, MODRM(MOD_R, dst.reg, src.reg));
+			write_b(0x0f, 0xaf, GEN_MODRM(MOD_R, dst.reg, src.reg));
 			break;
 		case ARIFM_IDIV_REG:
-			write_b(0xf7, MODRM(MOD_R, 7, src.reg));
+			write_b(0xf7, GEN_MODRM(MOD_R, 7, src.reg));
 			break;
 
 		default:	fprintf(stderr, "arifm type out of range\n");
@@ -368,7 +373,7 @@ void emit_arifm(const arifm_t type, operand_t dst, operand_t src)
 
 void emit_lea(const mod_t mod, const operand_t dst, const operand_t base, const int32_t disp)
 {
-	write_b(REX_W, 0x8d, MODRM(mod, dst.reg, base.reg));
+	write_b(REX_W, 0x8d, GEN_MODRM(mod, dst.reg, base.reg));
 
 	if(mod == MOD_M_DISP)	write_d((uint32_t)disp);
 }
