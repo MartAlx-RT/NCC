@@ -36,67 +36,72 @@
 
 Ветка `elf`
 .\
-├── `CMakeLists.txt`
-├── `include`
-│   ├── `def_emitters.h`
-│   ├── `def_grammar.h`
-│   ├── `def_perror.h`
-│   ├── `emitter.h`
-│   ├── `ncc.h`
-│   └── `undef_macros.h`
-└── `src`
-    ├── `ast.c`
-    ├── `ast_dump.c`
-    ├── `backend.c`
-    ├── `emitter.c`
-    ├── `grammar.txt`
-    ├── `input.c`
-    ├── `main.c`
-    ├── `parser.c`
+├── `CMakeLists.txt`\
+├── `include`\
+│   ├── `def_emitters.h`    (\#define макросов для эмиттеров)\
+│   ├── `def_grammar.h`     (\#define макросов для грамматики)\
+│   ├── `def_perror.h`      (\#define макросов для вывода ошибок)\
+│   ├── `emitter.h`         (эмиттеры)\
+│   ├── `ncc.h`\
+│   └── `undef_macros.h`    (\#undef макросов)\
+└── `src`\
+    ├── `ast.c`\
+    ├── `ast_dump.c`\
+    ├── `backend.c`\
+    ├── `emitter.c`\
+    ├── `grammar.txt`\
+    ├── `main.c`\
+    ├── `parser.c`\
     └── `tokenizer.c`
 
 ## Синтаксис
+Приведем пример функции `printf`, написанной на языке `cmm`.
 ```
-/* This is a comment */
+/* this is a comment */
 
-func main()
+/* function declaration */
+func printf(fmt /*, ...*/)
 {
-    x = 0; y = 0;            /* without types */
+    /* assembly insertion `nasm` will run for code in nasm("") */
+	nasm("lea r8, [rbp+3*8]");	/* first va_arg addr */
 
-    swap(&x, &y);            /* has pointers */
+    /* variable declaration */
+	arg = 0;			        /* variable for args */
 
-    return x;
+    /* `while` and `if` using C-like syntax */
+    /* `[var]` is the `var` dereferencing
+	while([fmt])
+	{
+		if([fmt] == '%')
+		{
+			fmt = fmt+1;
 
-    asm("; asm comment");   /* inline asm supported */
-}
+			if([fmt] == '%')	putc('%');
+			else
+			{
+				nasm("mov rax, [r8]\n mov [rbp-8], rax\n add r8, 8");	/* get arg */
 
-func swap(px, py)
-{
-    x = [px];               /* asm-style dereference */
-    [px] = [py];
-    [py] = x;
+				if([fmt] == 'd')	    putn_base(arg,  10);    /* function call */
+				else if([fmt] == 'x')	putn_base(arg,  16);
+				else if([fmt] == 'b')	putn_base(arg,  2);
+				else if([fmt] == 'o')	putn_base(arg,  8);
+				else if([fmt] == 'c')	putc(arg);
+				else if([fmt] == 's')	puts(arg);
+				else if([fmt] == '*')	pass;                   /* `pass` means to do nothing
+				else
+				{
+					puts("Runtime error: unexpected modifier\n");
+					return;
+				}
+			}
+		}
+		else	putc([fmt]);
 
-    return;                 /* return always needed */
-}
+		fmt = fmt+1;
+	}
 
-func loop_factorial(x)
-{
-    i = 1;
-    ans = 1;
-
-    while(i < x or i == x)  /* C/C++ like loops */
-    {
-        ans *= i;   i = i+1;
-    }
-
-    return ans;
-}
-
-func recursive_factorial(x)
-{
-    if(x > 1)   return x*recursive_factorial(x);
-
-    return 1;
+    /* all functions need `return;` or `return value;` at the end
+	return;
 }
 ```
 
@@ -104,10 +109,8 @@ func recursive_factorial(x)
 
 ### В исполняемый файл
 ```bash
-$ ncc <file>.cmm --asm <output_asm>.nasm  # компиляция в nasm
-$ nasm <output_nasm>.nasm -f elf64        # компиляция nasm
-$ ld <output_nasm>.o -o <executable>      # линковка
-$ ./<executable>
+$ ncc <file>.cmm -o <executable>    # компиляция в nasm
+$ ./<executable>                    # запуск
 ```
 
 ### Дамп дерева абстрактного синтаксиса
@@ -163,7 +166,17 @@ Compile: parse failed
 ```
 
 ## Дальнейшее развитие проекта
--   Генерация бинарного файла без зависимостей
+-   Динамическая и статическая линковки
+-   Добавление поддержки va_args компилятором
+-   Добавление поддержки архитектуры arm
 -   Добавление типизации
--   Строки
--   Стандартная библиотека
+
+## Команда разработчиков
+-   Мартынов Александр, школа ФРКТ МФТИ
+
+## Благодарности
+-   Илья Дединский (или просто дед)
+-   Продва РТ-2025
+-   Владимир Абубакиров, Данила Жебряков, и др. менторы
+-   Александр Белокопытов
+
